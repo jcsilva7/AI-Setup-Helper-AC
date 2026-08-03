@@ -1,8 +1,11 @@
 # Created by https://www.toptal.com/developers/gitignore/api/linux,visualstudiocode,lua
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,visualstudiocode,lua
 
+.env
+remember.txt
+
 # Other dev docs
-/helper-docs/*
+/helper-docs
 # Ac Lua sdk
 /lua-sdk
 
