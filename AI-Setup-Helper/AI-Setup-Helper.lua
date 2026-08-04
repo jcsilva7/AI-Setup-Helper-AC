@@ -1,5 +1,3 @@
-local sim = ac.getSim()
-
 --- @type table<string, boolean>
 App_Settings = ac.storage({
     localhosting = false,
@@ -18,11 +16,28 @@ if App_Settings.localhosting then
     dotenv.load()
 end
 
+local request_status = nil
+local request_response = nil
+
+local oversteer = false
+local understeer = false
+
+local includeTrackTemp = false
+local includeAirTemp = false
+local includeWeather = false
+local includeFuel = false
+
+
 --- Get all the sim data required to make the setup
----@return _ string                  The json with all the data
+---@return _ table|nil                  The table with all the data
 local function get_sim_data()
-    if !ac.isSetupAvailableToEdit() then
-        return json.encode({})
+    if not ac.isSetupAvailableToEdit() then
+        return nil
+    end
+
+    local sim = ac.getSim()
+    if sim == nil then
+        return nil
     end
 
     -- Temps and weather
@@ -40,11 +55,12 @@ local function get_sim_data()
         layout_name = ac.getTrackLayout(),
         car_name = ac.getCarName(0, true),
         track_temp = track_temp,
+        air_temp = air_temp,
         weather = weather,
         setup_data = setup_data_json
     }
 
-    return json.encode(data)
+    return data
 end
 
 local function apply_setup(data) 
@@ -70,16 +86,9 @@ end
 -- Main part
 function script.windowMain(dt)
     local setup_data = get_sim_data()
-    local request_status = nil
-    local request_response = nil
-
-    local oversteer = false
-    local understeer = false
-
-    local includeTrackTemp = false
-    local includeAirTemp = false
-    local includeWeather = false
-    local includeFuel = false
+    if setup_data == nil then
+        return
+    end
 
     -- CONDITIONS --------------------------------------------------
     ui.text('Conditions')
@@ -100,7 +109,7 @@ function script.windowMain(dt)
     end
     
     if ui.checkbox('Weather', includeWeather) then includeWeather = not includeWeather end
-    if ~includeWeather then
+    if not includeWeather then
         setup_data.weather = nil
     end
     
@@ -120,6 +129,7 @@ function script.windowMain(dt)
     -- REQUEST ---------------------------------------------------------
     ui.newLine()
     if ui.button('Request', vec2(-1, 0)) then
+        local data = json.encode(setup_data)
         -- TODO: make request
         -- request_status = req.make_request(setup_data)
     end
