@@ -1,14 +1,22 @@
 local sim = ac.getSim()
 
+--- @type table<string, boolean>
+App_Settings = ac.storage({
+    localhosting = false,
+}, "AISetupHelper.Settings")
+
 -- UI functions
 local UI = require("ui")
 -- Jsons
 local json = require("json")
 local c_json = require("custom_json")
+-- Requests
+local req = require("requests")
 
--- Dotenv load
--- local dotenv = require("dotenv")
--- dotenv.load()
+if App_Settings.localhosting then
+    local dotenv = require("dotenv")
+    dotenv.load()
+end
 
 --- Get all the sim data required to make the setup
 ---@return _ string                  The json with all the data
@@ -63,6 +71,7 @@ end
 function script.windowMain(dt)
     local setup_data = get_sim_data()
     local request_status = nil
+    local request_response = nil
 
     local oversteer = false
     local understeer = false
@@ -112,13 +121,19 @@ function script.windowMain(dt)
     ui.newLine()
     if ui.button('Request', vec2(-1, 0)) then
         -- TODO: make request
+        -- request_status = req.make_request(setup_data)
     end
     
+    -- TODO: allow messages
     if request_status == nil then
         ui.text('Awaiting request')
     elseif request_status == 'success' then
         ui.textColored('Request acknowledged', rgbm.colors.green)
     else
-        ui.textColored('No response — retry', rgbm.colors.red)
+        if request_response ~= nil then
+            ui.textColored(request_response, rgbm.colors.red)
+        else
+            ui.textColored('Request Failed', rgbm.colors.red)
+        end
     end
 end
