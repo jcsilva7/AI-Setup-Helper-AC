@@ -1,42 +1,40 @@
 local R = {}
 
-local requests = require "http.request"
-
 --- Makes a post request to the LLM provider
 ---@param data    string
 ---@param api_key string
----@return string|nil
----@return string|nil
-local function make_local_request(data, api_key)
+---@param callback function
+local function make_local_request(data, api_key, callback)
     local url = "https://openrouter.ai/api/v1/chat/completions"
     local headers = {
         ["Authorization"] = "Bearer " .. api_key,
+        ["Content-Type"] = "application/json",
     }
 
     local model = ""
     local prompt = ""
 
-    local req = requests.new_from_uri(url)
-    req.headers:upsert(":method", "POST")
-    req.headers:upsert("content-type", "application/json")
+    local response, status
+    web.request(
+        "POST",
+        url,
+        headers,
+        '{"model":'..model..',"messages": [{"role": "user", "content": "'..prompt..'"}]}',
+        function(err, response)
+            if err then
+                if response and response.status == 429 then
+                    callback("Rate limit exceeded. Try again later.", false)
+                else
+                    callback(err, false)
+                end
 
-    req.set_body('{"model":'..model..',"messages": [{"role": "user", "content": "'..prompt..'"}]}')
+                return
+            end
+            
+            callback(response.body, true)
+        end
+    )
 
-    -- Make request
-    local headers, stream = assert(req:go())
-
-    local response_status = headers.get(":status")
-    response_status = tonumber(response_status)
-    if response_status ~= 200 then
-        return nil, nil
-    elseif response_status == 429 then
-        return nil, "Request Limit Reached"
-    end
-
-    -- Get response body
-    local response = assert(stream:get_body_as_string())
-
-    return response, nil
 end
 
 -- TODO: backend request
