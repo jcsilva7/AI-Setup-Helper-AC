@@ -1,5 +1,7 @@
 local R = {}
 
+local json = require("json")
+
 --- Makes a post request to the LLM provider
 ---@param data    string
 ---@param api_key string
@@ -11,15 +13,39 @@ local function make_local_request(data, api_key, callback)
         ["Content-Type"] = "application/json",
     }
 
-    local model = ""
-    local prompt = ""
+    -- According to research I did, the ranking of the models
+    -- based on performance/price ratio is:
+    -- deepseek-v4-flash
+    -- deepseek-v4-pro
+    -- Gemini 2.5 Flash
+    local model = "deepseek/deepseek-v4-flash"
+    local prompt = "You are an expert Assetto Corsa race engineer generating car setups.\n" ..
+        "You will be given a JSON object with car, track, and condition data. Ignore any field that is nil/null. If there is a value that should be considered into the setup, and is important.\n" ..
+        "Respond ONLY with a JSON array of {\"n\":..., \"v\":...} objects, where n is name and v is value, one per field you are changing. \n" ..
+        "Only modify setup parameters that already exist in the provided setup. Never invent new parameter names.\n" ..
+        "Do not include markdown formatting or any text outside the JSON array.\n" ..
+        "Stay within each field's min/max range if provided.\n\n" ..
+        "- If \"oversteer\" or \"understeer\" are true, adjust the setup to reduce the one that is true.\n" ..
+        "- If both are false, do not apply any oversteer/understeer-specific correction; base the setup purely on the " ..
+        "other provided data (track, car, temps, weather, fuel).\n" ..
+        "The setup should be a base stable setup, target a predictable, confidence-inspiring setup suitable for most drivers rather than an aggressive qualifying setup.\n" ..
+        "Data:\n" .. data
 
-    local response, status
+    local payload = json.encode({
+        model = model,
+        messages = {
+            {
+                role = "user",
+                content = prompt
+            }
+        }
+    })
+
     web.request(
         "POST",
         url,
         headers,
-        '{"model":'..model..',"messages": [{"role": "user", "content": "'..prompt..'"}]}',
+        payload,
         function(err, response)
             if err then
                 if response and response.status == 429 then
@@ -31,7 +57,16 @@ local function make_local_request(data, api_key, callback)
                 return
             end
             
-            callback(response.body, true)
+            local body = json.decode(response.body)
+            if not body
+                or not body.choices
+                or not body.choices[1]
+                or not body.choices[1].message then
+                callback("Invalid response from provider.", false)
+                return
+            end
+            local content = body.choices[1].message.content
+            callback(content, true)
         end
     )
 
