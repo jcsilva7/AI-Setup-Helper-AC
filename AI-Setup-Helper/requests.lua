@@ -75,3 +75,5 @@ end
 -- TODO: backend request
 
 R.make_local_request = make_local_request
+
+return R

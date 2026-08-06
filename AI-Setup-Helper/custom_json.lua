@@ -32,3 +32,5 @@ local function setupSpinnersToJson(spinners)
 end
 
 J.setupSpinnersToJson = setupSpinnersToJson
+
+return J
