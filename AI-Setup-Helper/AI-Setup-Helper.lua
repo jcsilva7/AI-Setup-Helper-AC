@@ -1,6 +1,6 @@
 App_Settings = ac.storage({
     localhosting = false,
-    api_key = nil,
+    api_key = "",
 }, "AISetupHelper.Settings")
 
 -- Jsons

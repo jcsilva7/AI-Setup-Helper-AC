@@ -38,6 +38,9 @@ local function make_local_request(data, api_key, callback)
                 role = "user",
                 content = prompt
             }
+        },
+        reasoning = {
+            enabled = false
         }
     })
 

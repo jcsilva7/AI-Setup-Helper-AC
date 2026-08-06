@@ -1,6 +1,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/linux,visualstudiocode,lua
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,visualstudiocode,lua
 
+/test
 .env
 remember.txt
 
