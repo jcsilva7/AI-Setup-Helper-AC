@@ -13,6 +13,8 @@ local function make_local_request(data, api_key, callback)
         ["Content-Type"] = "application/json",
     }
 
+    ac.debug("LLM Data", data)
+
     -- According to research I did, the ranking of the models
     -- based on performance/price ratio is:
     -- deepseek-v4-flash
@@ -28,7 +30,8 @@ local function make_local_request(data, api_key, callback)
         "- If \"oversteer\" or \"understeer\" are true, adjust the setup to reduce the one that is true.\n" ..
         "- If both are false, do not apply any oversteer/understeer-specific correction; base the setup purely on the " ..
         "other provided data (track, car, temps, weather, fuel).\n" ..
-        "The setup should be a base stable setup, target a predictable, confidence-inspiring setup suitable for most drivers rather than an aggressive qualifying setup.\n" ..
+        "Assume the current setup is only a starting point, not an optimized setup. Analyze every adjustable parameter and modify any parameter that would improve the setup for the given track and conditions. Leave a parameter unchanged only if you determine it is already near its optimal value.\n" ..
+        "You should return a modified setup. That setup should be a base stable setup, target a predictable, confidence-inspiring setup suitable for most drivers rather than an aggressive qualifying setup.\n" ..
         "Data:\n" .. data
 
     local payload = json.encode({
@@ -68,6 +71,7 @@ local function make_local_request(data, api_key, callback)
                 callback("Invalid response from provider.", false)
                 return
             end
+            ac.debug("LLM Response", body.choices[1].message.content)
             local content = body.choices[1].message.content
             callback(content, true)
         end

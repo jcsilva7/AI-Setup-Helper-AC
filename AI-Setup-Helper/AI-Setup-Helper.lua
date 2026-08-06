@@ -1,11 +1,10 @@
 App_Settings = ac.storage({
-    localhosting = false,
+    common = false,
     api_key = "",
 }, "AISetupHelper.Settings")
 
--- Jsons
+-- Json
 local json = require("json")
-local c_json = require("custom_json")
 -- Requests
 local request = require("requests")
 
@@ -19,6 +18,68 @@ local includeTrackTemp = false
 local includeAirTemp = false
 local includeWeather = false
 local includeFuel = false
+
+-- The llm has no clue what the values are :|
+local WeatherTypeNames = {
+    [ac.WeatherType.LightThunderstorm] = "LightThunderstorm",
+    [ac.WeatherType.Thunderstorm] = "Thunderstorm",
+    [ac.WeatherType.HeavyThunderstorm] = "HeavyThunderstorm",
+    [ac.WeatherType.LightDrizzle] = "LightDrizzle",
+    [ac.WeatherType.Drizzle] = "Drizzle",
+    [ac.WeatherType.HeavyDrizzle] = "HeavyDrizzle",
+    [ac.WeatherType.LightRain] = "LightRain",
+    [ac.WeatherType.Rain] = "Rain",
+    [ac.WeatherType.HeavyRain] = "HeavyRain",
+    [ac.WeatherType.LightSnow] = "LightSnow",
+    [ac.WeatherType.Snow] = "Snow",
+    [ac.WeatherType.HeavySnow] = "HeavySnow",
+    [ac.WeatherType.LightSleet] = "LightSleet",
+    [ac.WeatherType.Sleet] = "Sleet",
+    [ac.WeatherType.HeavySleet] = "HeavySleet",
+    [ac.WeatherType.Clear] = "Clear",
+    [ac.WeatherType.FewClouds] = "FewClouds",
+    [ac.WeatherType.ScatteredClouds] = "ScatteredClouds",
+    [ac.WeatherType.BrokenClouds] = "BrokenClouds",
+    [ac.WeatherType.OvercastClouds] = "OvercastClouds",
+    [ac.WeatherType.Fog] = "Fog",
+    [ac.WeatherType.Mist] = "Mist",
+    [ac.WeatherType.Smoke] = "Smoke",
+    [ac.WeatherType.Haze] = "Haze",
+    [ac.WeatherType.Sand] = "Sand",
+    [ac.WeatherType.Dust] = "Dust",
+    [ac.WeatherType.Squalls] = "Squalls",
+    [ac.WeatherType.Tornado] = "Tornado",
+    [ac.WeatherType.Hurricane] = "Hurricane",
+    [ac.WeatherType.Cold] = "Cold",
+    [ac.WeatherType.Hot] = "Hot",
+    [ac.WeatherType.Windy] = "Windy",
+    [ac.WeatherType.Hail] = "Hail",
+}
+
+--- Convert spinners into a Table
+---@diagnostic disable-next-line: undefined-doc-name
+---@param spinners ac.SetupSpinner[]    Table with the setup data
+---@return _ string                     Table data
+local function setupSpinnersToTable(spinners)
+    local data = {}
+
+    for i, spinner in ipairs(spinners) do
+        data[i] = {
+            n = spinner.name,
+            v = spinner.value,
+            min = spinner.minimum,
+            max = spinner.maximum,
+            s = spinner.step,
+            unit = spinner.units,
+        }
+
+        if spinner.itemValues then
+            data[i].items = spinner.itemValues
+        end
+    end
+
+    return data
+end
 
 --- Get all the sim data required to make the setup
 ---@return _ table|nil                  The table with all the data
@@ -36,11 +97,11 @@ local function get_sim_data()
     local track_temp = sim.roadTemperature
     local air_temp = sim.ambientTemperature
 
-    local weather = sim.weatherConditions
-    
+    local weather = WeatherTypeNames[sim.weatherType] or "Unknown"
+
     -- Get all available setup data and turn it into a json
     local setup_data = ac.getSetupSpinners()
-    local setup_data_json = c_json.setupSpinnersToJson(setup_data)
+    local setup_data_table = setupSpinnersToTable(setup_data)
 
     local data = {
         track_name = ac.getTrackName(),
@@ -49,7 +110,7 @@ local function get_sim_data()
         track_temp = track_temp,
         air_temp = air_temp,
         weather = weather,
-        setup_data = setup_data_json
+        setup_data = setup_data_table
     }
 
     return data
@@ -73,10 +134,12 @@ local function apply_setup(data)
             spinner.value = entry.v
         end
     end
+
 end
 
 -- Main part
 function script.windowMain(dt)
+    -- FIXME: obviously this overwrites the ui selector, and is not very efficient
     local setup_data = get_sim_data()
     if setup_data == nil then
         return
@@ -132,7 +195,7 @@ function script.windowMain(dt)
         setup_data["understeer"] = understeer
         local data = json.encode(setup_data)
         
-        if App_Settings.localhosting then
+        if App_Settings.common then
             request.make_local_request(data, App_Settings.api_key, function(response, success)
                 if success then
                     request_status = 'success'
@@ -177,18 +240,18 @@ function script.windowSettings(dt)
     ui.text('Request mode')
     ui.separator()
 
-    if ui.radioButton('Backend', not App_Settings.localhosting) then
-        App_Settings.localhosting = false
+    if ui.radioButton('Backend', not App_Settings.common) then
+        App_Settings.common = false
     end
     ui.sameLine()
-    if ui.radioButton('Local', App_Settings.localhosting) then
-        App_Settings.localhosting = true
+    if ui.radioButton('Local', App_Settings.common) then
+        App_Settings.common = true
     end
 
     ui.newLine()
-    if App_Settings.localhosting then
-        ui.textColored('Requests will be sent to a local server using your API key.', rgbm.colors.yellow)
+    if App_Settings.common then
+        ui.textColored('Requests will be sent using your configuration with your API key.', rgbm.colors.yellow)
     else
-        ui.textColored('Requests will be sent to a common service.', rgbm.colors.yellow)
+        ui.textColored('Requests will be sent to a common service.\nLimited daily requests, shared with all users.', rgbm.colors.yellow)
     end
 end
