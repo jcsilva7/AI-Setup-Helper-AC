@@ -3,8 +3,6 @@ App_Settings = ac.storage({
     api_key = nil,
 }, "AISetupHelper.Settings")
 
--- UI functions
-local UI = require("ui")
 -- Jsons
 local json = require("json")
 local c_json = require("custom_json")
