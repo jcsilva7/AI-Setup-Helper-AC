@@ -73,6 +73,8 @@ local function make_local_request(data, api_key, callback)
             end
             ac.debug("LLM Response", body.choices[1].message.content)
             local content = body.choices[1].message.content
+            -- Clean json
+            content = content:gsub("^```json%s*", ""):gsub("^```%s*", ""):gsub("```%s*$", "")
             callback(content, true)
         end
     )

@@ -3,6 +3,9 @@ App_Settings = ac.storage({
     api_key = "",
 }, "AISetupHelper.Settings")
 
+-- FIXME: if user leaves setup window cancel the request
+-- TODO: improve error handling, missed requests improper api keys
+
 -- Json
 local json = require("json")
 -- Requests
@@ -18,6 +21,11 @@ local includeTrackTemp = false
 local includeAirTemp = false
 local includeWeather = false
 local includeFuel = false
+
+local tempSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-helper-setup.ini'
+local backupSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-helper-backup.ini'
+
+local hasBackup = false
 
 -- The llm has no clue what the values are :|
 local WeatherTypeNames = {
@@ -110,6 +118,8 @@ local function get_sim_data()
         track_temp = track_temp,
         air_temp = air_temp,
         weather = weather,
+        -- Default to 20
+        laps_fuel = 20,
         setup_data = setup_data_table
     }
 
@@ -117,30 +127,55 @@ local function get_sim_data()
 end
 
 local function apply_setup(data) 
-    local saved = json.decode(data)
+    local ok, saved = pcall(json.decode, data)
+    if not ok or saved == nil then
+        ac.warn("Failed to parse LLM setup response")
+        return
+    end
+    if type(saved) ~= "table" then
+        ac.warn("LLM setup response must be a JSON array")
+        return
+    end
+
+    -- create backup
+    ac.saveCurrentSetup(backupSetupPath)
+    hasBackup = true
+
     local spinners = ac.getSetupSpinners()
-
-    -- Index current spinners by their internal name
     local spinnerMap = {}
-
     for _, spinner in ipairs(spinners) do
         spinnerMap[spinner.name] = spinner
     end
 
-    -- Apply saved values
     for _, entry in ipairs(saved) do
         local spinner = spinnerMap[entry.n]
-        if spinner and not spinner.readOnly then
-            spinner.value = entry.v
+        if spinner and not spinner.readOnly and entry.v ~= nil then
+            local v = tonumber(entry.v) or entry.v
+            if type(v) == "number" and spinner.min and spinner.max then
+                v = math.clamp(v, spinner.min, spinner.max)
+            end
+
+            local applied = ac.setSetupSpinnerValue(entry.n, v)
+            if not applied then
+                ac.warn("Failed to apply setup field: " .. tostring(entry.n))
+            end
+        else
+            ac.warn("Skipping unknown/read-only field: "..tostring(entry.n))
         end
     end
-
 end
 
+local function revert_setup()
+    ac.loadSetup(backupSetupPath)
+end
+
+local setup_data
 -- Main part
 function script.windowMain(dt)
-    -- FIXME: obviously this overwrites the ui selector, and is not very efficient
-    local setup_data = get_sim_data()
+    if setup_data == nil then
+        setup_data = get_sim_data()
+    end
+    
     if setup_data == nil then
         return
     end
@@ -152,15 +187,11 @@ function script.windowMain(dt)
     if ui.checkbox('Track temp', includeTrackTemp) then includeTrackTemp = not includeTrackTemp end
     if includeTrackTemp then
         setup_data.track_temp = ui.slider('##trackTemp', setup_data.track_temp, 0, 80, 'Track: %.0f°C')
-    else
-        setup_data.track_temp = nil
     end
     
     if ui.checkbox('Air temp', includeAirTemp) then includeAirTemp = not includeAirTemp end
     if includeAirTemp then
         setup_data.air_temp = ui.slider('##airTemp', setup_data.air_temp, 0, 60, 'Air: %.0f°C')
-    else
-        setup_data.air_temp = nil
     end
     
     if ui.checkbox('Weather', includeWeather) then includeWeather = not includeWeather end
@@ -170,7 +201,7 @@ function script.windowMain(dt)
     
     if ui.checkbox('Fuel', includeFuel) then includeFuel = not includeFuel end
     if includeFuel then
-        setup_data["laps_fuel"] = ui.slider('##fuel', 20, 1, 99, 'Fuel: %.0f laps')        
+        setup_data["laps_fuel"] = ui.slider('##fuel', setup_data["laps_fuel"], 1, 99, 'Fuel: %.0f laps')        
     end
     
     -- FIX -----------------------------------------------------------
@@ -195,6 +226,20 @@ function script.windowMain(dt)
         setup_data["understeer"] = understeer
         local data = json.encode(setup_data)
         
+        if type(data) ~= "string" then
+            ac.warn("Failed to encode setup data")
+            return
+        end
+
+        -- Clear values here, to allow them to appear on the selector
+        if not includeAirTemp then
+            setup_data.air_temp = nil
+        end 
+
+        if not includeWeather then
+            setup_data.weather = nil
+        end
+
         if App_Settings.common then
             request.make_local_request(data, App_Settings.api_key, function(response, success)
                 if success then
@@ -215,6 +260,16 @@ function script.windowMain(dt)
         ui.text('Awaiting request')
     elseif request_status == 'success' then
         ui.textColored('Request acknowledged', rgbm.colors.green)
+
+        if hasBackup then
+            ui.sameLine()
+            if ui.button('Revert') then
+                revert_setup()
+                hasBackup = false
+                request_status = nil
+                request_response = nil
+            end
+        end
     elseif request_status == 'pending' then
         ui.textColored('Request pending', rgbm.colors.yellow)
     else
