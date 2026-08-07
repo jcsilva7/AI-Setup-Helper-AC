@@ -29,6 +29,26 @@ local hasBackup = false
 
 -- Too much free time
 local easter_egg = false
+local egg_index = 0
+local egg_initial = {
+    "You just wait, sunshine, you just wait",
+    "I need a white visor. Otherwise, I cannot see anything.",
+    "Okay for reference,\n that lap exceeded track limits at turn 19\n so that lap won't count. Don't answer me, thank you.",
+    "Kimi, you will have the full information on the steering wheel,\n blue flags, keep pushing...",
+    "We think it might be... water.",
+}
+
+local egg_last = {
+    "Du bist Weltmeister!",
+    "Felipe, baby, stay cool",
+    "(silence)",
+    "Leave me alone, I know what to do.",
+    "My goodness, what an idea. Why didn't I think of that?\n Let's add that to the words of wisdom."
+}
+
+-- Get random seed and discard first results
+math.randomseed(os.time() + math.floor(ac.getSim().currentSessionTime * 1000))
+math.random(); math.random(); math.random()
 
 -- The llm has no clue what the values are :|
 local WeatherTypeNames = {
@@ -226,6 +246,7 @@ function script.windowMain(dt)
     if ui.button('Request', vec2(-1, 0)) then                
         if request_status == "pending" then
             easter_egg = true
+            egg_index = math.random(#egg_initial)
         else
             easter_egg = false
             request_status = "pending"
@@ -272,7 +293,7 @@ function script.windowMain(dt)
         ui.text('Awaiting request')
     elseif request_status == 'success' then
         if easter_egg then
-            ui.textColored('Du bist Weltmeister!', rgbm.colors.green)
+            ui.textColored(egg_last[egg_index], rgbm.colors.green)
         else
             ui.textColored('Request acknowledged', rgbm.colors.green)
         end
@@ -287,7 +308,7 @@ function script.windowMain(dt)
             end
         end
     elseif request_status == 'pending' and easter_egg then
-        ui.textColored('You just wait, sunshine, you just wait', rgbm.colors.yellow)
+        ui.textColored(egg_initial[egg_index], rgbm.colors.yellow)
     elseif request_status == 'pending' then
         ui.textColored('Request pending', rgbm.colors.yellow)
     else
