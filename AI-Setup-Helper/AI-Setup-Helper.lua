@@ -27,6 +27,9 @@ local backupSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-
 
 local hasBackup = false
 
+-- Too much free time
+local easter_egg = false
+
 -- The llm has no clue what the values are :|
 local WeatherTypeNames = {
     [ac.WeatherType.LightThunderstorm] = "LightThunderstorm",
@@ -201,7 +204,7 @@ function script.windowMain(dt)
     
     if ui.checkbox('Fuel', includeFuel) then includeFuel = not includeFuel end
     if includeFuel then
-        setup_data["laps_fuel"] = ui.slider('##fuel', setup_data["laps_fuel"], 1, 99, 'Fuel: %.0f laps')        
+        setup_data["laps_fuel"] = ui.slider('##fuel', setup_data["laps_fuel"], 1, 99, 'Fuel: %.0f laps')
     end
     
     -- FIX -----------------------------------------------------------
@@ -209,57 +212,70 @@ function script.windowMain(dt)
     ui.text('Fix')
     ui.separator()
     
-    if ui.checkbox('Oversteer', oversteer) then oversteer = not oversteer end
-    if ui.checkbox('Understeer', understeer) then understeer = not understeer end
+    if ui.checkbox('Oversteer', oversteer) then
+        oversteer = not oversteer
+        understeer = false
+    end
+    if ui.checkbox('Understeer', understeer) then
+        understeer = not understeer
+        oversteer = false
+    end
     
     -- REQUEST ---------------------------------------------------------
     ui.newLine()
-    if ui.button('Request', vec2(-1, 0)) then
+    if ui.button('Request', vec2(-1, 0)) then                
         if request_status == "pending" then
-            return
-        end
-
-        request_status = "pending"
-        request_response = ""
-        
-        setup_data["oversteer"] = oversteer
-        setup_data["understeer"] = understeer
-        local data = json.encode(setup_data)
-        
-        if type(data) ~= "string" then
-            ac.warn("Failed to encode setup data")
-            return
-        end
-
-        -- Clear values here, to allow them to appear on the selector
-        if not includeAirTemp then
-            setup_data.air_temp = nil
-        end 
-
-        if not includeWeather then
-            setup_data.weather = nil
-        end
-
-        if App_Settings.common then
-            request.make_local_request(data, App_Settings.api_key, function(response, success)
-                if success then
-                    request_status = 'success'
-                    request_response = response
-                    apply_setup(response)
-                else
-                    request_status = 'failed'
-                    request_response = response
-                end
-            end)
+            easter_egg = true
         else
-            -- TODO: backend request
+            easter_egg = false
+            request_status = "pending"
+            request_response = ""
+            
+            setup_data["oversteer"] = oversteer
+            setup_data["understeer"] = understeer
+
+            -- Clear values here, to allow them to appear on the selector
+            if not includeAirTemp then
+                setup_data.air_temp = nil
+            end 
+
+            if not includeWeather then
+                setup_data.weather = nil
+            end
+
+            local data = json.encode(setup_data)
+            
+            if type(data) ~= "string" then
+                ac.warn("Failed to encode setup data")
+                request_status = "failed"
+                return
+            end
+
+            if App_Settings.common then
+                request.make_local_request(data, App_Settings.api_key, function(response, success)
+                    if success then
+                        request_status = 'success'
+                        request_response = response
+                        apply_setup(response)
+                    else
+                        request_status = 'failed'
+                        request_response = response
+                    end
+                end)
+            else
+                -- TODO: backend request
+            end
         end
     end
     
     if request_status == nil then
         ui.text('Awaiting request')
     elseif request_status == 'success' then
-        ui.textColored('Request acknowledged', rgbm.colors.green)
+        if easter_egg then
+            ui.textColored('Du bist Weltmeister!', rgbm.colors.green)
+        else
+            ui.textColored('Request acknowledged', rgbm.colors.green)
+        end
 
         if hasBackup then
             ui.sameLine()
@@ -270,6 +286,8 @@ function script.windowMain(dt)
                 request_response = nil
             end
         end
+    elseif request_status == 'pending' and easter_egg then
+        ui.textColored('You just wait, sunshine, you just wait', rgbm.colors.yellow)
     elseif request_status == 'pending' then
         ui.textColored('Request pending', rgbm.colors.yellow)
     else
