@@ -3,9 +3,6 @@ App_Settings = ac.storage({
     api_key = "",
 }, "AISetupHelper.Settings")
 
--- FIXME: if user leaves setup window cancel the request
--- TODO: improve error handling, missed requests improper api keys
-
 -- Json
 local json = require("json")
 -- Requests
@@ -273,7 +270,7 @@ function script.windowMain(dt)
             end
 
             if App_Settings.common then
-                request.make_local_request(data, App_Settings.api_key, function(response, success)
+                request.make_common_request(data, App_Settings.api_key, function(response, success)
                     if success then
                         request_status = 'success'
                         request_response = response
@@ -334,11 +331,11 @@ function script.windowSettings(dt)
     ui.text('Request mode')
     ui.separator()
 
-    if ui.radioButton('Backend', not App_Settings.common) then
+    if ui.radioButton('Common', not App_Settings.common) then
         App_Settings.common = false
     end
     ui.sameLine()
-    if ui.radioButton('Local', App_Settings.common) then
+    if ui.radioButton('Personal', App_Settings.common) then
         App_Settings.common = true
     end
 

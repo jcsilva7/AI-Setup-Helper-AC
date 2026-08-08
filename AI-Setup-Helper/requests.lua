@@ -6,7 +6,7 @@ local json = require("json")
 ---@param data    string
 ---@param api_key string
 ---@param callback function
-local function make_local_request(data, api_key, callback)
+local function make_common_request(data, api_key, callback)
     local url = "https://openrouter.ai/api/v1/chat/completions"
     local headers = {
         ["Authorization"] = "Bearer " .. api_key,
@@ -47,6 +47,11 @@ local function make_local_request(data, api_key, callback)
         }
     })
 
+    if type(payload) ~= "string" then
+        callback("Failed to encode request payload.", false)
+        return
+    end
+
     web.request(
         "POST",
         url,
@@ -54,8 +59,16 @@ local function make_local_request(data, api_key, callback)
         payload,
         function(err, response)
             if err then
-                if response and response.status == 429 then
-                    callback("Rate limit exceeded. Try again later.", false)
+                if response then
+                    if response.status == 429 then
+                        callback("Rate limit exceeded. Try again later.", false)
+                    elseif response.status == 401 then
+                        callback("Unauthorized. Check your API key.", false)
+                    elseif response.status == 502 then
+                        callback("Chosen provider is down. Try again later.", false)
+                    elseif response.status == 402 then
+                        callback("One of us screwed up. And ran out of credits. (If you use the common provider, it was me, sorry)", false)
+                    end
                 else
                     callback(err, false)
                 end
@@ -63,7 +76,11 @@ local function make_local_request(data, api_key, callback)
                 return
             end
             
-            local body = json.decode(response.body)
+            local ok, body = pcall(json.decode, response.body)
+            if not ok or not body then
+                callback("Invalid JSON response from provider.", false)
+                return
+            end
             if not body
                 or not body.choices
                 or not body.choices[1]
@@ -83,6 +100,6 @@ end
 
 -- TODO: backend request
 
-R.make_local_request = make_local_request
+R.make_common_request = make_common_request
 
 return R
