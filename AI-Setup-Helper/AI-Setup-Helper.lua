@@ -17,7 +17,6 @@ local understeer = false
 local includeTrackTemp = false
 local includeAirTemp = false
 local includeWeather = false
-local includeFuel = false
 
 local tempSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-helper-setup.ini'
 local backupSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-helper-backup.ini'
@@ -139,7 +138,6 @@ local function get_sim_data()
         air_temp = air_temp,
         weather = weather,
         -- Default to 20
-        laps_fuel = 20,
         setup_data = setup_data_table
     }
 
@@ -218,12 +216,7 @@ function script.windowMain(dt)
     if not includeWeather then
         setup_data.weather = nil
     end
-    
-    if ui.checkbox('Fuel', includeFuel) then includeFuel = not includeFuel end
-    if includeFuel then
-        setup_data["laps_fuel"] = ui.slider('##fuel', setup_data["laps_fuel"], 1, 99, 'Fuel: %.0f laps')
-    end
-    
+
     -- FIX -----------------------------------------------------------
     ui.newLine()
     ui.text('Fix')
