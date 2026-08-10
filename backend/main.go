@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 var SetupCache *internal.Cache
@@ -156,6 +158,11 @@ Data: ` + bodyString
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	// Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -177,7 +184,7 @@ func main() {
 	SetupCache = internal.NewCache(24*time.Hour, 1*time.Hour)
 
 	log.Println("Listening on port " + port)
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}
