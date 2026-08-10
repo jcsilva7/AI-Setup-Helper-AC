@@ -38,8 +38,8 @@ type Cache struct {
 // It is not like the LLM has got it right for the original,
 // so it is better to just give the cached for similar temps
 type ShadyComparison struct {
-	AirTemp   int    `json:"air_temp"`
-	TrackTemp int    `json:"track_temp"`
+	AirTemp   *int   `json:"air_temp"`
+	TrackTemp *int   `json:"track_temp"`
 	Weather   string `json:"weather"`
 }
 
@@ -101,8 +101,8 @@ func (c *Cache) GetCacheSetup(key Key, comparison ShadyComparison) []byte {
 		return nil
 	}
 
-	if comparison.TrackTemp == -1 || math.Abs(float64(comparison.TrackTemp-cachedSetup.comparison.TrackTemp)) <= TempsThreshold {
-		if comparison.AirTemp == -1 || math.Abs(float64(comparison.AirTemp-cachedSetup.comparison.AirTemp)) <= TempsThreshold {
+	if *comparison.TrackTemp == -1 || math.Abs(float64(*comparison.TrackTemp-*cachedSetup.comparison.TrackTemp)) <= TempsThreshold {
+		if *comparison.AirTemp == -1 || math.Abs(float64(*comparison.AirTemp-*cachedSetup.comparison.AirTemp)) <= TempsThreshold {
 			return cachedSetup.data
 		}
 	}
