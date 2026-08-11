@@ -40,7 +40,7 @@ func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 	// check if request will be rate limited
 	machineHash := req.Header.Get("X-Machine-Hash")
 	if machineHash == "" {
-		http.Error(res, "Missing X-Machine-Hash header", http.StatusBadRequest)
+		http.Error(res, "Invalid request", http.StatusBadRequest)
 		return
 	}
 	ip := clientIP(req)
@@ -235,16 +235,19 @@ func main() {
 	}
 
 	// Start HTTP server
+	ServeMux := http.NewServeMux()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	http.HandleFunc("POST /setup", getSetupRequest)
-
 	server := http.Server{
-		Addr: ":" + port,
+		Addr:    ":" + port,
+		Handler: ServeMux,
 	}
+
+	ServeMux.HandleFunc("POST /setup", getSetupRequest)
 
 	apiKey = os.Getenv("API_KEY")
 	if apiKey == "" {
