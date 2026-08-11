@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -15,6 +16,10 @@ import (
 
 var SetupCache *internal.Cache
 
+// one for the machine-key-hashes from the CSP sdk, another for the IP addresses
+var MachineLimiter *internal.RateLimiter
+var IPLimiter *internal.RateLimiter
+
 var apiKey string
 
 type SetupRequest struct {
@@ -22,7 +27,33 @@ type SetupRequest struct {
 	internal.ShadyComparison
 }
 
+// Get client IP (remove port)
+func clientIP(req *http.Request) string {
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return req.RemoteAddr
+	}
+	return host
+}
+
 func getSetupRequest(res http.ResponseWriter, req *http.Request) {
+	// check if request will be rate limited
+	machineHash := req.Header.Get("X-Machine-Hash")
+	if machineHash == "" {
+		http.Error(res, "Missing X-Machine-Hash header", http.StatusBadRequest)
+		return
+	}
+	ip := clientIP(req)
+
+	if !MachineLimiter.Limit(machineHash) {
+		http.Error(res, "Rate limit exceeded", http.StatusTooManyRequests)
+		return
+	}
+	if !IPLimiter.Limit(ip) {
+		http.Error(res, "Rate limit exceeded", http.StatusTooManyRequests)
+		return
+	}
+
 	// Read body
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -37,6 +68,7 @@ func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 		}
 	}(req.Body)
 
+	// read request body
 	bodyString := string(bodyBytes)
 	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
 	var body SetupRequest
@@ -50,16 +82,18 @@ func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// get key and comparison data
 	checkKey := body.Key
 	comparison := body.ShadyComparison
-	defaultTemp := -1
+
 	if comparison.TrackTemp == nil {
-		comparison.TrackTemp = &defaultTemp
+		comparison.TrackTemp = new(-1)
 	}
 	if comparison.AirTemp == nil {
-		comparison.AirTemp = &defaultTemp
+		comparison.AirTemp = new(-1)
 	}
 
+	// try to get cached setup
 	cachedSetup := SetupCache.GetCacheSetup(checkKey, comparison)
 	if cachedSetup != nil {
 		res.Header().Set("Content-Type", "application/json")
@@ -144,16 +178,53 @@ Data: ` + bodyString
 		return
 	}
 
+	// check status code from the provider
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Provider returned status %d: %s\n", resp.StatusCode, responseBody)
+		if resp.StatusCode == http.StatusTooManyRequests {
+			res.WriteHeader(http.StatusTooManyRequests)
+		} else {
+			res.WriteHeader(http.StatusBadGateway)
+		}
+		return
+	}
+
+	var providerResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	// get actual content of the provider response
+	if err = json.Unmarshal(responseBody, &providerResp); err != nil {
+		log.Printf("Error decoding provider response: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Provider returned nothing
+	if len(providerResp.Choices) == 0 {
+		log.Println("Provider returned no choices")
+		res.WriteHeader(http.StatusBadGateway)
+		return
+	}
+
+	content := []byte(providerResp.Choices[0].Message.Content)
+
+	// Put in cache
+	SetupCache.Put(checkKey, comparison, content)
+
+	// Write successful response
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	_, err = res.Write(responseBody)
+	_, err = res.Write(content)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	// FIXME: better provider response handling
 
-	// TODO: put in cache
 	log.Println("Request succeeded")
 }
 
@@ -182,6 +253,10 @@ func main() {
 
 	// Create cache (before server start)
 	SetupCache = internal.NewCache(24*time.Hour, 1*time.Hour)
+
+	// Create rate limiter objects
+	MachineLimiter = internal.NewRateLimiter(5, 3, 24*time.Hour)
+	IPLimiter = internal.NewRateLimiter(15, 5, 24*time.Hour)
 
 	log.Println("Listening on port " + port)
 	err = server.ListenAndServe()

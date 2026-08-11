@@ -99,6 +99,7 @@ local function make_common_request(data, api_key, callback)
 end
 
 -- TODO: backend request
+-- TODO: add machine hash in header
 
 R.make_common_request = make_common_request
 
