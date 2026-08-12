@@ -2,11 +2,7 @@ local R = {}
 
 local json = require("json")
 
---- Makes a post request to the LLM provider
----@param data    string
----@param api_key string
----@param callback function
-local function make_common_request(data, api_key, callback)
+local function direct_payload(data, api_key)
     local url = "https://openrouter.ai/api/v1/chat/completions"
     local headers = {
         ["Authorization"] = "Bearer " .. api_key,
@@ -47,6 +43,40 @@ local function make_common_request(data, api_key, callback)
         }
     })
 
+    return url, headers, payload
+end
+
+local function common_payload(data, api_key)
+    local url = ""
+
+    if CachedMachineHash == nil then
+        getHash()
+    end
+
+    local headers = {
+        ["Content-Type"] = "application/json",
+        ["X-Machine-Hash"] = CachedMachineHash
+    }
+
+    ac.debug("LLM Data", data)
+    
+    return url, headers, data
+end
+
+--- Makes the request to the chosen provider
+--- @param common   boolean
+---@param data      string
+---@param api_key   string
+---@param callback function
+function R.make_request(common, data, api_key, callback)
+    local url, headers, payload
+    
+    if common then
+        url, headers, payload = common_payload(data, api_key)
+    else
+        url, headers, payload = direct_payload(data, api_key)
+    end
+
     if type(payload) ~= "string" then
         callback("Failed to encode request payload.", false)
         return
@@ -68,6 +98,8 @@ local function make_common_request(data, api_key, callback)
                         callback("Chosen provider is down. Try again later.", false)
                     elseif response.status == 402 then
                         callback("One of us screwed up. And ran out of credits. (If you use the common provider, it was me, sorry)", false)
+                    else
+                        callback("Request failed with status: " .. response.status, false)
                     end
                 else
                     callback(err, false)
@@ -76,20 +108,28 @@ local function make_common_request(data, api_key, callback)
                 return
             end
             
-            local ok, body = pcall(json.decode, response.body)
-            if not ok or not body then
-                callback("Invalid JSON response from provider.", false)
-                return
+            local content = ""
+
+            if common then
+                content = response.body
+            else
+                local ok, body = pcall(json.decode, response.body)
+                if not ok or not body then
+                    callback("Invalid JSON response from provider.", false)
+                    return
+                end
+                if not body
+                    or not body.choices
+                    or not body.choices[1]
+                    or not body.choices[1].message then
+                    callback("Invalid response from provider.", false)
+                    return
+                end
+
+                ac.debug("LLM Response", body.choices[1].message.content)
+                content = body.choices[1].message.content
             end
-            if not body
-                or not body.choices
-                or not body.choices[1]
-                or not body.choices[1].message then
-                callback("Invalid response from provider.", false)
-                return
-            end
-            ac.debug("LLM Response", body.choices[1].message.content)
-            local content = body.choices[1].message.content
+
             -- Clean json
             content = content:gsub("^```json%s*", ""):gsub("^```%s*", ""):gsub("```%s*$", "")
             callback(content, true)
@@ -97,10 +137,5 @@ local function make_common_request(data, api_key, callback)
     )
 
 end
-
--- TODO: backend request
--- TODO: add machine hash in header
-
-R.make_common_request = make_common_request
 
 return R

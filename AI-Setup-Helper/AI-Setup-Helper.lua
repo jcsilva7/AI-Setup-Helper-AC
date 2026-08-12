@@ -1,5 +1,5 @@
 App_Settings = ac.storage({
-    common = false,
+    common = true,
     api_key = "",
 }, "AISetupHelper.Settings")
 
@@ -22,6 +22,18 @@ local tempSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-he
 local backupSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-helper-backup.ini'
 
 local hasBackup = false
+
+CachedMachineHash = nil
+function getHash()
+    ac.uniqueMachineKeyAsync(function(err, keyData)
+        if not err then
+            CachedMachineHash = ac.checksumSHA256('ai-setup-helper'..keyData)
+        end
+    end)
+end
+
+-- Async so many attempts to make sure it works
+getHash()
 
 -- Too much free time
 local easter_egg = false
@@ -82,6 +94,8 @@ local WeatherTypeNames = {
     [ac.WeatherType.Windy] = "Windy",
     [ac.WeatherType.Hail] = "Hail",
 }
+
+
 
 --- Convert spinners into a Table
 ---@diagnostic disable-next-line: undefined-doc-name
@@ -262,20 +276,17 @@ function script.windowMain(dt)
                 return
             end
 
-            if App_Settings.common then
-                request.make_common_request(data, App_Settings.api_key, function(response, success)
-                    if success then
-                        request_status = 'success'
-                        request_response = response
-                        apply_setup(response)
-                    else
-                        request_status = 'failed'
-                        request_response = response
-                    end
-                end)
-            else
-                -- TODO: backend request
-            end
+            request.make_request(App_Settings.common, data, App_Settings.api_key, function(response, success)
+                if success then
+                    request_status = 'success'
+                    request_response = response
+                    apply_setup(response)
+                else
+                    request_status = 'failed'
+                    request_response = response
+                end
+            end)
+        
         end
     end
     
@@ -324,18 +335,18 @@ function script.windowSettings(dt)
     ui.text('Request mode')
     ui.separator()
 
-    if ui.radioButton('Common', not App_Settings.common) then
-        App_Settings.common = false
+    if ui.radioButton('Common', App_Settings.common) then
+        App_Settings.common = true
     end
     ui.sameLine()
-    if ui.radioButton('Personal', App_Settings.common) then
-        App_Settings.common = true
+    if ui.radioButton('Personal', not App_Settings.common) then
+        App_Settings.common = false
     end
 
     ui.newLine()
     if App_Settings.common then
-        ui.textColored('Requests will be sent using your configuration with your API key.', rgbm.colors.yellow)
-    else
         ui.textColored('Requests will be sent to a common service.\nLimited daily requests, shared with all users.', rgbm.colors.yellow)
+    else
+        ui.textColored('Requests will be sent using your configuration with your API key.', rgbm.colors.yellow)
     end
 end

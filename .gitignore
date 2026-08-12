@@ -273,7 +273,6 @@ luac.out
 *.x86_64
 *.hex
 
-
 ### VisualStudioCode ###
 .vscode/*
 !.vscode/settings.json
@@ -296,3 +295,5 @@ luac.out
 # End of https://www.toptal.com/developers/gitignore/api/linux,lua,go,goland,visualstudiocode,jetbrains
 /backend/.env
 /AI-Setup-Helper/.env
+.idea/
+.vscode/
