@@ -37,23 +37,6 @@ func clientIP(req *http.Request) string {
 }
 
 func getSetupRequest(res http.ResponseWriter, req *http.Request) {
-	// check if request will be rate limited
-	machineHash := req.Header.Get("X-Machine-Hash")
-	if machineHash == "" {
-		http.Error(res, "Invalid request", http.StatusBadRequest)
-		return
-	}
-	ip := clientIP(req)
-
-	if !MachineLimiter.Limit(machineHash) {
-		http.Error(res, "Rate limit exceeded", http.StatusTooManyRequests)
-		return
-	}
-	if !IPLimiter.Limit(ip) {
-		http.Error(res, "Rate limit exceeded", http.StatusTooManyRequests)
-		return
-	}
-
 	// Read body
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -228,10 +211,41 @@ Data: ` + bodyString
 	log.Println("Request succeeded")
 }
 
+// Rate Limiting and Blacklisting
+func middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := clientIP(r)
+
+		// check if IP is blacklisted
+		if internal.IsBlacklisted(ip) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		// check if request will be rate limited
+		machineHash := r.Header.Get("X-Machine-Hash")
+		if machineHash == "" {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if !MachineLimiter.Limit(machineHash) {
+			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+		if !IPLimiter.Limit(ip) {
+			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("Error loading .env file")
 	}
 
 	// Start HTTP server
@@ -247,11 +261,11 @@ func main() {
 		Handler: ServeMux,
 	}
 
-	ServeMux.HandleFunc("POST /setup", getSetupRequest)
+	ServeMux.Handle("POST /setup", middleware(http.HandlerFunc(getSetupRequest)))
 
 	apiKey = os.Getenv("API_KEY")
 	if apiKey == "" {
-		log.Fatal("No API key set")
+		log.Println("No API key set")
 	}
 
 	// Create cache (before server start)
@@ -260,6 +274,9 @@ func main() {
 	// Create rate limiter objects
 	MachineLimiter = internal.NewRateLimiter(5, 3, 24*time.Hour)
 	IPLimiter = internal.NewRateLimiter(15, 5, 24*time.Hour)
+
+	// Load blacklist
+	internal.LoadBlacklist("blacklist.txt")
 
 	log.Println("Listening on port " + port)
 	err = server.ListenAndServe()

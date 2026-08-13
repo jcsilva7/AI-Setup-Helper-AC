@@ -297,3 +297,4 @@ luac.out
 /AI-Setup-Helper/.env
 .idea/
 .vscode/
+/backend/blacklist.txt
