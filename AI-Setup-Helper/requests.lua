@@ -98,6 +98,8 @@ function R.make_request(common, data, api_key, callback)
                         callback("Chosen provider is down. Try again later.", false)
                     elseif response.status == 402 then
                         callback("One of us screwed up. And ran out of credits. (If you use the common provider, it was me, sorry)", false)
+                    elseif response.status == 413 then
+                        callback("Body size too large", false)
                     else
                         callback("Request failed with status: " .. response.status, false)
                     end

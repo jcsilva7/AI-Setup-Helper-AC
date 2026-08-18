@@ -4,6 +4,7 @@ import (
 	"ai-setup-helper-backend/internal"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net"
@@ -22,6 +23,9 @@ var IPLimiter *internal.RateLimiter
 
 var apiKey string
 
+// 64 KB
+var maxBodySize int64 = 64
+
 type SetupRequest struct {
 	internal.Key
 	internal.ShadyComparison
@@ -37,19 +41,26 @@ func clientIP(req *http.Request) string {
 }
 
 func getSetupRequest(res http.ResponseWriter, req *http.Request) {
-	// Read body
-	bodyBytes, err := io.ReadAll(req.Body)
-	if err != nil {
-		log.Printf("Error reading request body: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
 			log.Printf("Error closing body: %v\n", err)
 		}
 	}(req.Body)
+
+	// Read body
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Printf("Error reading request body: %v\n", err)
+
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			http.Error(res, "Request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+
+		http.Error(res, "Failed to read request", http.StatusBadRequest)
+		return
+	}
 
 	// read request body
 	bodyString := string(bodyBytes)
@@ -237,6 +248,9 @@ func middleware(next http.Handler) http.Handler {
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
+
+		// Limit body size read
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize*1024)
 
 		next.ServeHTTP(w, r)
 	})
