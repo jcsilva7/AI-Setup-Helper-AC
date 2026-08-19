@@ -33,7 +33,14 @@ type SetupRequest struct {
 
 // Get client IP (remove port)
 func clientIP(req *http.Request) string {
-	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	// check headers because of hosting proxy
+	host := req.Header.Get("X-Forwarded-For")
+	if host != "" {
+		return host
+	}
+
+	var err error
+	host, _, err = net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		return req.RemoteAddr
 	}
