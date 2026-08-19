@@ -248,7 +248,7 @@ Data: ` + bodyString
 }
 
 // Check conectivity
-func health(res http.ResponseWriter, _ *http.Request) {
+func healthz(res http.ResponseWriter, _ *http.Request) {
 	res.WriteHeader(http.StatusOK)
 }
 
@@ -310,7 +310,7 @@ func main() {
 		Handler: ServeMux,
 	}
 
-	ServeMux.HandleFunc("GET /health", health)
+	ServeMux.HandleFunc("GET /health", healthz)
 	ServeMux.Handle("POST /setup", middleware(http.HandlerFunc(getSetupRequest)))
 
 	apiKey = os.Getenv("API_KEY")
