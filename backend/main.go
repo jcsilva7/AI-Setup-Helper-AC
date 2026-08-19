@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -34,7 +35,12 @@ type SetupRequest struct {
 // Get client IP (remove port)
 func clientIP(req *http.Request) string {
 	// check headers because of hosting proxy
-	host := req.Header.Get("X-Forwarded-For")
+	var host string
+	// and get first (which should match network ip)
+	ips := strings.Split(req.Header.Get("X-Forwarded-For"), ",")
+	if len(ips) > 0 {
+		host = strings.TrimSpace(ips[0])
+	}
 	if host != "" {
 		return host
 	}
