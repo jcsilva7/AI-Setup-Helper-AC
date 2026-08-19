@@ -205,7 +205,19 @@ Data: ` + bodyString
 		return
 	}
 
-	content := []byte(providerResp.Choices[0].Message.Content)
+	var setupChanges []map[string]any
+	if err = json.Unmarshal([]byte(providerResp.Choices[0].Message.Content), &setupChanges); err != nil {
+		log.Printf("Provider content is not a valid JSON array: %v\n", err)
+		res.WriteHeader(http.StatusBadGateway)
+		return
+	}
+
+	content, err := json.Marshal(setupChanges)
+	if err != nil {
+		log.Printf("Error encoding setup response: %v\n", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	// Put in cache
 	SetupCache.Put(checkKey, comparison, content)
@@ -235,6 +247,7 @@ func middleware(next http.Handler) http.Handler {
 		// check if IP is blacklisted
 		if internal.IsBlacklisted(ip) {
 			http.Error(w, "Forbidden", http.StatusForbidden)
+			log.Println("Blacklisted IP Requested: ", ip)
 			return
 		}
 
@@ -242,15 +255,18 @@ func middleware(next http.Handler) http.Handler {
 		machineHash := r.Header.Get("X-Machine-Hash")
 		if machineHash == "" {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+			log.Println("Request without machine hash: ", ip)
 			return
 		}
 
 		if !MachineLimiter.Limit(machineHash) {
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			log.Println("Rate limit exceeded: ", machineHash, ip)
 			return
 		}
 		if !IPLimiter.Limit(ip) {
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			log.Println("Rate limit exceeded: ", ip)
 			return
 		}
 
@@ -258,6 +274,7 @@ func middleware(next http.Handler) http.Handler {
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize*1024)
 
 		next.ServeHTTP(w, r)
+		log.Println("Request Received...")
 	})
 }
 

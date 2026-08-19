@@ -47,7 +47,7 @@ local function direct_payload(data, api_key)
 end
 
 local function common_payload(data, api_key)
-    local url = ""
+    local url = "https://ai-setup-helper-ac.onrender.com/setup"
 
     if CachedMachineHash == nil then
         getHash()
