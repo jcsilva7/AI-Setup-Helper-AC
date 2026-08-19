@@ -222,6 +222,11 @@ Data: ` + bodyString
 	log.Println("Request succeeded")
 }
 
+// Check conectivity
+func health(res http.ResponseWriter, _ *http.Request) {
+	res.WriteHeader(http.StatusOK)
+}
+
 // Rate Limiting and Blacklisting
 func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -275,6 +280,7 @@ func main() {
 		Handler: ServeMux,
 	}
 
+	ServeMux.HandleFunc("GET /health", health)
 	ServeMux.Handle("POST /setup", middleware(http.HandlerFunc(getSetupRequest)))
 
 	apiKey = os.Getenv("API_KEY")
