@@ -88,7 +88,8 @@ function R.make_request(common, data, api_key, callback)
         headers,
         payload,
         function(err, response)
-            if err then
+            local status = response and response.status or nil
+            if err or not status or status < 200 or status >= 300 then
                 if response then
                     if response.status == 429 then
                         callback("Rate limit exceeded. Try again later.", false)
@@ -104,7 +105,7 @@ function R.make_request(common, data, api_key, callback)
                         callback("Request failed with status: " .. response.status, false)
                     end
                 else
-                    callback(err, false)
+                    callback(err or "No response from provider.", false)
                 end
 
                 return
