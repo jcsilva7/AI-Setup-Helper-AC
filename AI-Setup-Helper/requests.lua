@@ -16,7 +16,7 @@ local function direct_payload(data, api_key)
     -- deepseek-v4-flash
     -- deepseek-v4-pro
     -- Gemini 2.5 Flash
-    local model = "deepseek/deepseek-v4-flash"
+    local model = "google/gemini-2.5-flash"
     local prompt = "You are an expert Assetto Corsa race engineer generating car setups.\n" ..
         "You will be given a JSON object with car, track, and condition data. Ignore any field that is nil/null. If there is a value that should be considered into the setup, and is important.\n" ..
         "Respond ONLY with a JSON array of {\"n\":..., \"v\":...} objects, where n is name and v is value, one per field you are changing. \n" ..
