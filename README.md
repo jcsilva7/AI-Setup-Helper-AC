@@ -21,6 +21,10 @@ descriptions for the fields in the game).
 
 ![app image](img/app.png)
 
+Icon maker
+
+<a href="https://www.flaticon.com/free-icons/repair" title="repair icons">Repair icons created by Eucalyp - Flaticon</a>
+
 ## Usage
 
 Click on the 'Request' button to get the setup. If you wish to include the fields available, click on the boxes.

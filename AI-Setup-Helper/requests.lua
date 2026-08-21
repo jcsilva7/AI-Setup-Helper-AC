@@ -40,7 +40,7 @@ local function direct_payload(data, api_key)
         },
         max_tokens = 1500,
         reasoning = {
-            enabled = false
+            enabled = true
         }
     })
 

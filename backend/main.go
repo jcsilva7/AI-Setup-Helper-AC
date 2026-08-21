@@ -142,7 +142,7 @@ Data: ` + bodyString
 		},
 		"max_tokens": 1500,
 		"reasoning": map[string]bool{
-			"enabled": false,
+			"enabled": true,
 		},
 	})
 	if err != nil {
