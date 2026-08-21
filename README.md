@@ -25,6 +25,12 @@ Icon maker
 
 <a href="https://www.flaticon.com/free-icons/repair" title="repair icons">Repair icons created by Eucalyp - Flaticon</a>
 
+Also, if you really like this app, you can support it :)
+https://ko-fi.com/jcsilva
+
+My other mod:
+https://www.overtake.gg/downloads/battery-helper.85815/
+
 ## Usage
 
 Click on the 'Request' button to get the setup. If you wish to include the fields available, click on the boxes.
