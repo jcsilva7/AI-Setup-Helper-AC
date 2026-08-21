@@ -16,7 +16,7 @@ descriptions for the fields in the game).
 
 - [Usage](#usage)
 - [Modes](#modes)
-- [**Set Up Personal Mode**](#set-up-personal-mode) - recommended if you want to use your own OpenRouter key
+- [**Set Up Personal Mode**](#set-up-personal-mode) - recommended if you do not want to be dependent of the shared app
 
 
 ![app image](img/app.png)
