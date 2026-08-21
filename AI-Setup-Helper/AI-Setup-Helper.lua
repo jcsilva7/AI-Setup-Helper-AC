@@ -18,6 +18,10 @@ local includeTrackTemp = false
 local includeAirTemp = false
 local includeWeather = false
 
+-- Store to not overwrite
+local customTrackTemp = nil
+local customAirTemp = nil
+
 local tempSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-helper-setup.ini'
 local backupSetupPath = ac.getFolder(ac.FolderID.AppDataLocal)..'/Temp/ai-setup-helper-backup.ini'
 
@@ -216,14 +220,26 @@ function script.windowMain(dt)
     ui.text('Conditions')
     ui.separator()
     
-    if ui.checkbox('Track temp', includeTrackTemp) then includeTrackTemp = not includeTrackTemp end
+    if ui.checkbox('Track temp', includeTrackTemp) then
+        includeTrackTemp = not includeTrackTemp
+        if includeTrackTemp then
+            customTrackTemp = setup_data.track_temp
+        end
+    end
     if includeTrackTemp then
-        setup_data.track_temp = ui.slider('##trackTemp', setup_data.track_temp, 0, 80, 'Track: %.0f°C')
+        customTrackTemp = customTrackTemp or setup_data.track_temp
+        customTrackTemp = ui.slider('##trackTemp', customTrackTemp, 0, 80, 'Track: %.0f°C')
     end
     
-    if ui.checkbox('Air temp', includeAirTemp) then includeAirTemp = not includeAirTemp end
+    if ui.checkbox('Air temp', includeAirTemp) then
+        includeAirTemp = not includeAirTemp
+        if includeAirTemp then
+            customAirTemp = setup_data.air_temp
+        end
+    end
     if includeAirTemp then
-        setup_data.air_temp = ui.slider('##airTemp', setup_data.air_temp, 0, 60, 'Air: %.0f°C')
+        customAirTemp = customAirTemp or setup_data.air_temp
+        customAirTemp = ui.slider('##airTemp', customAirTemp, 0, 60, 'Air: %.0f°C')
     end
     
     if ui.checkbox('Weather', includeWeather) then includeWeather = not includeWeather end
@@ -255,14 +271,31 @@ function script.windowMain(dt)
             easter_egg = false
             request_status = "pending"
             request_response = ""
-            
+
+            -- fetch data again
+            local current_data = get_sim_data()
+            if current_data == nil then
+                ac.warn("Setup data not available")
+                return
+            end
+            setup_data = current_data
+
+
             setup_data["oversteer"] = oversteer
             setup_data["understeer"] = understeer
 
             -- Clear values here, to allow them to appear on the selector
             if not includeAirTemp then
                 setup_data.air_temp = nil
-            end 
+            else
+                setup_data.air_temp = customAirTemp
+            end
+
+            if not includeTrackTemp then
+                setup_data.track_temp = nil
+            else
+                setup_data.track_temp = customTrackTemp
+            end
 
             if not includeWeather then
                 setup_data.weather = nil

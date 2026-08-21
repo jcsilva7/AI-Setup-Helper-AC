@@ -103,7 +103,7 @@ function R.make_request(common, data, api_key, callback)
                     elseif response.status == 413 then
                         callback("Body size too large", false)
                     else
-                        callback("Request failed with status: " .. response.status, false)
+                        callback("Request failed. Try again in a bit", false)
                     end
                 else
                     callback(err or "No response from provider.", false)
