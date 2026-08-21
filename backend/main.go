@@ -140,6 +140,7 @@ Data: ` + bodyString
 				"content": providerBodyText,
 			},
 		},
+		"max_tokens": 1500,
 		"reasoning": map[string]bool{
 			"enabled": false,
 		},
