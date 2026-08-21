@@ -161,8 +161,9 @@ Data: ` + bodyString
 	providerReq.Header.Set("Content-Type", "application/json")
 	providerReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	// send request (60s is enough for Render cold start + actual request)
+	// send request
 	client := &http.Client{
+		// enough time even for the slow responding models (deepseek is quite slow)
 		Timeout: time.Second * 60,
 	}
 	resp, err := client.Do(providerReq)

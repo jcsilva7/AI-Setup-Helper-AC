@@ -207,6 +207,7 @@ end
 
 local setup_data
 -- Main part
+-- TODO: timeout
 function script.windowMain(dt)
     if setup_data == nil then
         setup_data = get_sim_data()
