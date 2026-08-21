@@ -137,6 +137,9 @@ and paste the key into the field.
 Also make sure the 'Personal' mode is selected.
 
 It should look something like this:
+
 ![personal config](img/personal_config.png)
+
+If you wish to use a free model (OpenRouter usually lets you go into -1 balance, which is a lot of setups, so to start you can freely use the paid models, like the one already set in the app), go to the app folder (usually assettocorsa/apps/lua/AI-Setup-Helper-AC) and open the `requests.lua` file, and change the line (use ctrl+f with `local model =`) `model = "whatever model is here"` to `model = "openrouter/free"` (this routes between all free models, to choose one, put the name).
 
 With this you can now use the app with your own key, making you less dependent of my shared app.
