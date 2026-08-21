@@ -255,6 +255,12 @@ func healthz(res http.ResponseWriter, _ *http.Request) {
 
 // Rate Limiting and Blacklisting
 func middleware(next http.Handler) http.Handler {
+	// Worth noting that the security here it's a joke
+	// Any script kiddie with an AI and a few braincells can DoS this
+	// But the idea of the app is to be plug n' play, and auth would change that
+	// If I force people to create accounts (or any other method) to get keys, then people may not be interested enough
+	// to use it
+	// I would not do all that for an in-game app for a racing game
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
 
