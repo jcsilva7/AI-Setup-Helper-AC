@@ -39,6 +39,15 @@ end
 -- Async so many attempts to make sure it works
 getHash()
 
+-- Set timeout times in ms (first three are default values, last is the response, and only one that actually matters)
+-- 60s is enough to take into account the app cold start and the api response (hopefully)
+web.timeouts(4000, 10000, 30000, 60000)
+
+-- Send a waking call to the backend app to initiate the cold start, before the user makes a request
+if App_Settings.common then
+    web.request("GET", "https://ai-setup-helper-ac.onrender.com/healthz", {}, "", function(_, _) end)
+end
+
 -- Too much free time
 local easter_egg = false
 local egg_index = 0
@@ -207,7 +216,6 @@ end
 
 local setup_data
 -- Main part
--- TODO: timeout
 function script.windowMain(dt)
     if setup_data == nil then
         setup_data = get_sim_data()

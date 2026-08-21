@@ -82,7 +82,8 @@ function R.make_request(common, data, api_key, callback)
         callback("Failed to encode request payload.", false)
         return
     end
-
+    
+    -- Set and make request here
     web.request(
         "POST",
         url,
