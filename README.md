@@ -12,6 +12,15 @@ fine-tune the setup to make
 it good, but by this point you should only need to tweak some fields (even if you have no clue what, read the 
 descriptions for the fields in the game).
 
+#### Quick links:
+
+- [Usage](#usage)
+- [Modes](#modes)
+- [**Set Up Personal Mode**](#set-up-personal-mode) - recommended if you want to use your own OpenRouter key
+
+
+![app image](img/app.png)
+
 ## Usage
 
 Click on the 'Request' button to get the setup. If you wish to include the fields available, click on the boxes.
@@ -59,6 +68,8 @@ The first request can take longer while it is booting up.
 - There are rate limits, so you make to many requests in a short period of time, you may be temporarily blocked.
 - You are dependent of me keeping up with the AI provider costs, and I am not Santa Claus, if they start asking me too
 much (or better anything at all), and there are no donations, I will turn it off also :)
+- Sometime in the future (if there is no money on the provider) I may switch to a free model, which means very few 
+requests per day and limited reasoning 
 
 ### Personal
 
@@ -68,7 +79,7 @@ This is the other one, it requires *some* configuration (creating an account and
 
 - You are only depend on the AI provider and not me and my shared app
 - May be faster (fewer requests made)
-- You can customise it better, you can change the prompt or the models in the `AI-Setup-Helper.lua` file
+- You can customise it better, you can change the prompt or the models in the `requests.lua` file
 
 #### Cons
 
@@ -77,3 +88,45 @@ This is the other one, it requires *some* configuration (creating an account and
 - If you screw up any configuration or any changes you make, that's on you.
 
 ## Set Up Personal Mode
+
+For the AI provider, I use OpenRouter, it has worked well for other projects, has a lot of models available and I've 
+been able to use it without using too many credits.
+
+You can use another one (these instructions will be for OpenRouter), there are some compatible with the app 
+(OpenAI, for example), currently,
+but if you choose another you may need to make some changes in the requests.
+
+### Create an account
+
+Well, you have to create an account here: https://openrouter.ai/
+
+When you have an account go to this page: https://openrouter.ai/workspaces/default/keys
+
+In here you can click the 'New Key' button (on the right) to create the key for the app.
+![create key button](img/openrouter_newkey.png)
+
+Choose a name like 'AI-Setup-Helper', or whatever as long as you can identify what it is,
+choose an expiration for the key (you can just leave it with no expiration, as long as you don't share the key), 
+and you can also leave a limit (in USD) for the key that resets periodically (this you can put like 1 or 10 dollars each
+month, year, whatever, it is good practice in case someone else gets access to it).
+
+![key details](img/key_details.png)
+
+Before the next step, two very important details.
+
+- Do not share the key, very bad idea
+- Make sure to copy it as soon as you create it, they will not let you see it again
+
+With this in mind, create the key and make sure to, temporarily store it wherever to then put it in-game.
+
+Inside Assetto Corsa, go to the setup menu, with the app open, click on the gear icon on the top right of the window,
+and paste the key into the field.
+
+![gear icon](img/settings_icon.png)
+
+Also make sure the 'Personal' mode is selected.
+
+It should look something like this:
+![personal config](img/personal_config.png)
+
+With this you can now use the app with your own key, making you less dependent of my shared app.
