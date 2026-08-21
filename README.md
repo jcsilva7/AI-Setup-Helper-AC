@@ -142,7 +142,7 @@ It should look something like this:
 
 ### Using Free Models
 
-OpenRouter allows small negative balances, so you can test paid models initially before switching. If you prefer to use zero-cost models, update your configuration:
+OpenRouter allows small negative balances (usually, -1 dollars), so you can test paid models initially before switching. If you prefer to use zero-cost models, update your configuration:
 
 1. Open the app folder (typically `assettocorsa/apps/lua/AI-Setup-Helper-AC`).
 2. Open `requests.lua` in any text editor
