@@ -78,8 +78,8 @@ The first request can take longer while it is booting up.
 - There are rate limits, so you make to many requests in a short period of time, you may be temporarily blocked.
 - You are dependent of me keeping up with the AI provider costs, and I am not Santa Claus, if they start asking me too
 much (or better anything at all), and there are no donations, I will turn it off also :)
-- Sometime in the future (if there is no money on the provider) I may switch to a free model, which means very few 
-requests per day and limited reasoning 
+- Sometime in the future (if there is no money on the provider) I may switch to a free model, which means very few
+requests per day and limited reasoning
 
 ### Personal
 
@@ -99,10 +99,10 @@ This is the other one, it requires *some* configuration (creating an account and
 
 ## Set Up Personal Mode
 
-For the AI provider, I use OpenRouter, it has worked well for other projects, has a lot of models available and I've 
+For the AI provider, I use OpenRouter, it has worked well for other projects, has a lot of models available and I've
 been able to use it without using too many credits.
 
-You can use another one (these instructions will be for OpenRouter), there are some compatible with the app 
+You can use another one (these instructions will be for OpenRouter), there are some compatible with the app
 (OpenAI, for example), currently,
 but if you choose another you may need to make some changes in the requests.
 
@@ -116,7 +116,7 @@ In here you can click the 'New Key' button (on the right) to create the key for 
 ![create key button](img/openrouter_newkey.png)
 
 Choose a name like 'AI-Setup-Helper', or whatever as long as you can identify what it is,
-choose an expiration for the key (you can just leave it with no expiration, as long as you don't share the key), 
+choose an expiration for the key (you can just leave it with no expiration, as long as you don't share the key),
 and you can also leave a limit (in USD) for the key that resets periodically (this you can put like 1 or 10 dollars each
 month, year, whatever, it is good practice in case someone else gets access to it).
 
@@ -140,6 +140,15 @@ It should look something like this:
 
 ![personal config](img/personal_config.png)
 
-If you wish to use a free model (OpenRouter usually lets you go into -1 balance, which is a lot of setups, so to start you can freely use the paid models, like the one already set in the app), go to the app folder (usually assettocorsa/apps/lua/AI-Setup-Helper-AC) and open the `requests.lua` file, and change the line (use ctrl+f with `local model =`) `model = "whatever model is here"` to `model = "openrouter/free"` (this routes between all free models, to choose one, put the name).
+### Using Free Models
+
+OpenRouter allows small negative balances, so you can test paid models initially before switching[cite: 14]. If you prefer to use zero-cost models, update your configuration:
+
+1. Open the app folder (typically `assettocorsa/apps/lua/AI-Setup-Helper-AC`).
+2. Open `requests.lua` in any text editor
+3. Search for `local model =` and update the line to:
+   ```lua
+   local model = "openrouter/free"
+   ```
 
 With this you can now use the app with your own key, making you less dependent of my shared app.
