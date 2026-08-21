@@ -24,7 +24,7 @@ var IPLimiter *internal.RateLimiter
 
 var apiKey string
 
-// 64 KB
+// 64 (KB)
 var maxBodySize int64 = 64
 
 type SetupRequest struct {
@@ -161,9 +161,9 @@ Data: ` + bodyString
 	providerReq.Header.Set("Content-Type", "application/json")
 	providerReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	// send request
+	// send request (60s is enough for Render cold start + actual request)
 	client := &http.Client{
-		Timeout: time.Second * 15,
+		Timeout: time.Second * 60,
 	}
 	resp, err := client.Do(providerReq)
 	if err != nil {
