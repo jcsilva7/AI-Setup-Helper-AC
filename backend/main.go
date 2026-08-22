@@ -111,10 +111,10 @@ func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 	comparison := body.ShadyComparison
 
 	if comparison.TrackTemp == nil {
-		comparison.TrackTemp = new(-1)
+		comparison.TrackTemp = new(-1.0)
 	}
 	if comparison.AirTemp == nil {
-		comparison.AirTemp = new(-1)
+		comparison.AirTemp = new(-1.0)
 	}
 
 	// try to get cached setup
@@ -157,7 +157,7 @@ Data: ` + bodyString
 				"content": providerBodyText,
 			},
 		},
-		"max_tokens": 1000,
+		"max_tokens": 1300,
 		"reasoning": map[string]bool{
 			"enabled": false, // change if gemini models
 		},
