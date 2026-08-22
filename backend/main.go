@@ -223,7 +223,7 @@ Data: ` + bodyString
 	var setupChanges []map[string]any
 	if err = json.Unmarshal([]byte(providerResp.Choices[0].Message.Content), &setupChanges); err != nil {
 		log.Printf("Provider content is not a valid JSON array: %v\n", err)
-		log.Println(providerResp.Choices[0].Message.Content)
+		log.Println(providerResp.Choices[0])
 		res.WriteHeader(http.StatusBadGateway)
 		return
 	}
