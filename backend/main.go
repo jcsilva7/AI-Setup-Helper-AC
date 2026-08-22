@@ -122,7 +122,7 @@ func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 	providerBodyText := `
 You are an expert Assetto Corsa race engineer generating car setups.
 You will be given a JSON object with car, track, and condition data. Ignore any field that is nil/null. If there is a value that should be considered into the setup, and is important.
-Respond ONLY with a JSON array of {"n":..., "v":...} objects, where n is name and v is value, one per field you are changing.
+Respond ONLY with a JSON array of {"n":..., "v":...} objects, if there is extra text in the response, it will be discarded, where n is name and v is value, one per field you are changing.
 Only modify setup parameters that already exist in the provided setup. Never invent new parameter names.
 Do not include markdown formatting or any text outside the JSON array.
 Stay within each field's min/max range if provided.
@@ -223,6 +223,7 @@ Data: ` + bodyString
 	var setupChanges []map[string]any
 	if err = json.Unmarshal([]byte(providerResp.Choices[0].Message.Content), &setupChanges); err != nil {
 		log.Printf("Provider content is not a valid JSON array: %v\n", err)
+		log.Println(providerResp.Choices[0].Message.Content)
 		res.WriteHeader(http.StatusBadGateway)
 		return
 	}
