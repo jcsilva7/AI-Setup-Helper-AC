@@ -108,8 +108,6 @@ local WeatherTypeNames = {
     [ac.WeatherType.Hail] = "Hail",
 }
 
-
-
 --- Convert spinners into a Table
 ---@diagnostic disable-next-line: undefined-doc-name
 ---@param spinners ac.SetupSpinner[]    Table with the setup data

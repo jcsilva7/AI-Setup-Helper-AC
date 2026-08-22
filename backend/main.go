@@ -16,8 +16,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// SetupCache Cache structure
 var SetupCache *internal.Cache
 
+// MachineLimiter
 // one for the machine-key-hashes from the CSP sdk, another for the IP addresses
 var MachineLimiter *internal.RateLimiter
 var IPLimiter *internal.RateLimiter
@@ -27,6 +29,7 @@ var apiKey string
 // 64 (KB)
 var maxBodySize int64 = 64
 
+// SetupRequest data to check cache
 type SetupRequest struct {
 	internal.Key
 	internal.ShadyComparison
@@ -53,6 +56,16 @@ func clientIP(req *http.Request) string {
 	return host
 }
 
+// Strip the response of extra content (some LLMs decide to add ```json[data]```)
+func stripCodeFence(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "```json")
+	s = strings.TrimPrefix(s, "```")
+	s = strings.TrimSuffix(s, "```")
+	return strings.TrimSpace(s)
+}
+
+// Make the request to get and return the setup from the LLM
 func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -220,9 +233,13 @@ Data: ` + bodyString
 		return
 	}
 
+	// Remove hallucinated extra chars
+	cleanContent := stripCodeFence(providerResp.Choices[0].Message.Content)
+
 	var setupChanges []map[string]any
-	if err = json.Unmarshal([]byte(providerResp.Choices[0].Message.Content), &setupChanges); err != nil {
+	if err = json.Unmarshal([]byte(cleanContent), &setupChanges); err != nil {
 		log.Printf("Provider content is not a valid JSON array: %v\n", err)
+		// Log the raw message to see what the LLM decided to invent
 		log.Println(providerResp.Choices[0].Message.Content)
 		res.WriteHeader(http.StatusBadGateway)
 		return
@@ -250,7 +267,7 @@ Data: ` + bodyString
 	log.Println("Request succeeded")
 }
 
-// Check connectivity
+// Check connectivity endpoint
 func healthz(res http.ResponseWriter, _ *http.Request) {
 	res.WriteHeader(http.StatusOK)
 }
