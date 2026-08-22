@@ -29,6 +29,7 @@ func LoadBlacklist(filePath string) {
 		ip := strings.TrimSpace(scanner.Text())
 		if ip != "" {
 			BlackListedIPs[ip] = struct{}{}
+			log.Println("Loaded Blacklisted IP: ", ip)
 		}
 	}
 
