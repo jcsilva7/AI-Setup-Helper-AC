@@ -119,8 +119,8 @@ local function setupSpinnersToTable(spinners)
         data[i] = {
             n = spinner.name,
             v = spinner.value,
-            min = spinner.minimum,
-            max = spinner.maximum,
+            min = spinner.min,
+            max = spinner.max,
             s = spinner.step,
             unit = spinner.units,
         }
