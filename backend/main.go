@@ -142,7 +142,7 @@ Data: ` + bodyString
 		},
 		"max_tokens": 1000,
 		"reasoning": map[string]bool{
-			"enabled": true,
+			"enabled": false, // change if gemini models
 		},
 	})
 	if err != nil {
@@ -223,7 +223,7 @@ Data: ` + bodyString
 	var setupChanges []map[string]any
 	if err = json.Unmarshal([]byte(providerResp.Choices[0].Message.Content), &setupChanges); err != nil {
 		log.Printf("Provider content is not a valid JSON array: %v\n", err)
-		log.Println(providerResp.Choices[0])
+		log.Println(providerResp.Choices[0].Message.Content)
 		res.WriteHeader(http.StatusBadGateway)
 		return
 	}
