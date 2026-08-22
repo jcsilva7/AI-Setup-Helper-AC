@@ -90,6 +90,10 @@ func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 
 	// read request body
 	bodyString := string(bodyBytes)
+
+	// Log body to find funny people
+	log.Printf("Request body from %s\n%s", clientIP(req), bodyString)
+
 	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
 	var body SetupRequest
 
@@ -312,7 +316,7 @@ func middleware(next http.Handler) http.Handler {
 		// Limit body size read
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize*2048)
 
-		log.Println("Request Received from ", ip, r.Body)
+		log.Println("Request Received from ", ip)
 
 		next.ServeHTTP(w, r)
 	})
