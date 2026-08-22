@@ -295,7 +295,7 @@ func middleware(next http.Handler) http.Handler {
 		log.Println("Request Received...")
 
 		// Limit body size read
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize*1024)
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize*2048)
 
 		next.ServeHTTP(w, r)
 	})
