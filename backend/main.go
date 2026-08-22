@@ -117,7 +117,7 @@ func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 
 	// Cache miss, request to provider
 	url := "https://openrouter.ai/api/v1/chat/completions"
-	model := "google/gemini-3.7-flash"
+	model := "deepseek/deepseek-v4-flash"
 
 	providerBodyText := `
 You are an expert Assetto Corsa race engineer generating car setups.
@@ -140,7 +140,7 @@ Data: ` + bodyString
 				"content": providerBodyText,
 			},
 		},
-		"max_tokens": 1500,
+		"max_tokens": 1000,
 		"reasoning": map[string]bool{
 			"enabled": true,
 		},
