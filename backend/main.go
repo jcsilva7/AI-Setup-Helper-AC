@@ -134,7 +134,7 @@ func getSetupRequest(res http.ResponseWriter, req *http.Request) {
 
 	// Cache miss, request to provider
 	url := "https://openrouter.ai/api/v1/chat/completions"
-	model := "google/gemma-4-26b-a4b-it:free"
+	model := "nvidia/nemotron-3-ultra-550b-a55b:free"
 
 	providerBodyText := `
 You are an expert Assetto Corsa race engineer generating car setups.
