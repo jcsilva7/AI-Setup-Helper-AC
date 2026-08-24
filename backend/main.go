@@ -2,10 +2,7 @@ package main
 
 import (
 	"ai-setup-helper-backend/internal"
-	"bytes"
 	"encoding/json"
-	"errors"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -26,8 +23,12 @@ var IPLimiter *internal.RateLimiter
 
 var apiKey string
 
+var endpoint string
+var deploymentName string
+var azureApiKey string
+
 // 64 (KB)
-var maxBodySize int64 = 64
+const maxBodySize int64 = 64
 
 // SetupRequest data to check cache
 type SetupRequest struct {
@@ -66,185 +67,67 @@ func stripCodeFence(s string) string {
 }
 
 // Make the request to get and return the setup from the LLM
-func getSetupRequest(res http.ResponseWriter, req *http.Request) {
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("Error closing body: %v\n", err)
+func getSetup(res http.ResponseWriter, req *http.Request) {
+	stuff := handleRequest(req)
+	if stuff.Err != nil {
+		if stuff.StatusCode != nil {
+			res.WriteHeader(*stuff.StatusCode)
+		} else {
+			res.WriteHeader(http.StatusInternalServerError)
+
 		}
-	}(req.Body)
-
-	// Read body
-	bodyBytes, err := io.ReadAll(req.Body)
-	if err != nil {
-		log.Printf("Error reading request body: %v\n", err)
-
-		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-			http.Error(res, "Request body too large", http.StatusRequestEntityTooLarge)
-			return
-		}
-
-		http.Error(res, "Failed to read request", http.StatusBadRequest)
+		log.Printf("Error reading request info: %v\n\n", stuff.Err)
 		return
 	}
 
-	// read request body
-	bodyString := string(bodyBytes)
-
-	// Log body to find funny people
-	log.Printf("Request body from %s\n%s", clientIP(req), bodyString)
-
-	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
-	var body SetupRequest
-
-	// Even the key data is malformed :|
-	if err := decoder.Decode(&body); err != nil {
-		log.Println("Failed to parse request body")
-		log.Println(err)
-
-		http.Error(res, "Failed to parse request body", http.StatusBadRequest)
-		return
-	}
-
-	// get key and comparison data
-	checkKey := body.Key
-	comparison := body.ShadyComparison
-
-	if comparison.TrackTemp == nil {
-		comparison.TrackTemp = new(-1.0)
-	}
-	if comparison.AirTemp == nil {
-		comparison.AirTemp = new(-1.0)
-	}
-
-	// try to get cached setup
-	cachedSetup := SetupCache.GetCacheSetup(checkKey, comparison)
-	if cachedSetup != nil {
+	if stuff.CachedSetup != nil {
 		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusOK)
 
-		if _, err := res.Write(cachedSetup); err != nil {
-			log.Println(err)
+		if _, err := res.Write(stuff.CachedSetup); err != nil {
+			log.Printf("Error writing response: %v\n", err)
 			return
 		}
 
-		log.Println("Cache Hit")
+		log.Println("Cache hit")
 		return
 	}
+
+	bodyString := stuff.BodyString
+
+	var responseSetup string
 
 	// Cache miss, request to provider
-	url := "https://openrouter.ai/api/v1/chat/completions"
-	model := "nvidia/nemotron-3-ultra-550b-a55b:free"
+	openRouterResponse := OpenRouterRequest(req.Context(), bodyString)
+	if openRouterResponse.Err != nil {
+		//res.WriteHeader(openRouterResponse.StatusCode)
+		log.Printf("OpenRouter Error -> %s\n", openRouterResponse.Err)
 
-	providerBodyText := `
-You are an expert Assetto Corsa race engineer generating car setups.
-You will be given a JSON object with car, track, and condition data. Ignore any field that is nil/null. If there is a value that should be considered into the setup, and is important.
-Respond ONLY with a JSON array of {"n":..., "v":...} objects, if there is extra text in the response, it will be discarded, where n is name and v is value, one per field you are changing.
-Only modify setup parameters that already exist in the provided setup. Never invent new parameter names.
-Do not include markdown formatting or any text outside the JSON array.
-Stay within each field's min/max range if provided.
-- If "oversteer" or "understeer" are true, adjust the setup to reduce the one that is true.
-- If both are false, do not apply any oversteer/understeer-specific correction; base the setup purely on the other provided data (track, car, temps, weather, fuel).
-Assume the current setup is only a starting point, not an optimized setup. Analyze every adjustable parameter and modify any parameter that would improve the setup for the given track and conditions. Leave a parameter unchanged only if you determine it is already near its optimal value.
-You should return a modified setup. That setup should be a base stable setup, target a predictable, confidence-inspiring setup suitable for most drivers rather than an aggressive qualifying setup.
-Data: ` + bodyString
+		// Try with Microslop alternative (Always fallback to this)
+		azureResponse := AzureRequest(req.Context(), bodyString)
+		if azureResponse.Err != nil {
+			if azureResponse.StatusCode != nil {
+				res.WriteHeader(*azureResponse.StatusCode)
+			} else {
+				res.WriteHeader(http.StatusInternalServerError)
+			}
 
-	payload, err := json.Marshal(map[string]any{
-		"model": model,
-		"messages": []map[string]string{
-			{
-				"role":    "user",
-				"content": providerBodyText,
-			},
-		},
-		"max_tokens": 1300,
-		"reasoning": map[string]bool{
-			"enabled": false, // change if gemini models
-		},
-	})
-	if err != nil {
-		res.WriteHeader(http.StatusInternalServerError)
-		log.Printf("Error encoding provider payload: %v\n", err)
-		return
-	}
-
-	providerReq, err := http.NewRequestWithContext(req.Context(), "POST", url, bytes.NewBuffer(payload))
-	if err != nil {
-		res.WriteHeader(http.StatusInternalServerError)
-		log.Println(err)
-		return
-	}
-
-	providerReq.Header.Set("Content-Type", "application/json")
-	providerReq.Header.Set("Authorization", "Bearer "+apiKey)
-
-	// send request
-	client := &http.Client{
-		// enough time even for the slow responding models (deepseek is quite slow)
-		Timeout: time.Second * 60,
-	}
-	resp, err := client.Do(providerReq)
-	if err != nil {
-		log.Printf("Error sending request: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("Error closing body: %v\n", err)
+			log.Printf("Azure Error -> %s\n", azureResponse.Err)
+			return
 		}
-	}(resp.Body)
 
-	// read response
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading response: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+		responseSetup = azureResponse.Setup
 
-	// check status code from the provider
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("Provider returned status %d: %s\n", resp.StatusCode, responseBody)
-		if resp.StatusCode == http.StatusTooManyRequests {
-			res.WriteHeader(http.StatusTooManyRequests)
-		} else {
-			res.WriteHeader(http.StatusBadGateway)
-		}
-		return
-	}
-
-	var providerResp struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-
-	// get actual content of the provider response
-	if err = json.Unmarshal(responseBody, &providerResp); err != nil {
-		log.Printf("Error decoding provider response: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	// Provider returned nothing
-	if len(providerResp.Choices) == 0 {
-		log.Println("Provider returned no choices")
-		res.WriteHeader(http.StatusBadGateway)
-		return
+	} else {
+		responseSetup = openRouterResponse.Setup
 	}
 
 	// Remove hallucinated extra chars
-	cleanContent := stripCodeFence(providerResp.Choices[0].Message.Content)
+	cleanContent := stripCodeFence(responseSetup)
 
 	var setupChanges []map[string]any
-	if err = json.Unmarshal([]byte(cleanContent), &setupChanges); err != nil {
+	if err := json.Unmarshal([]byte(cleanContent), &setupChanges); err != nil {
 		log.Printf("Provider content is not a valid JSON array: %v\n", err)
-		// Log the raw message to see what the LLM decided to invent
-		log.Println(providerResp.Choices[0].Message.Content)
 		res.WriteHeader(http.StatusBadGateway)
 		return
 	}
@@ -257,7 +140,7 @@ Data: ` + bodyString
 	}
 
 	// Put in cache
-	SetupCache.Put(checkKey, comparison, content)
+	SetupCache.Put(stuff.CheckKey, stuff.Comparison, content)
 
 	// Write successful response
 	res.Header().Set("Content-Type", "application/json")
@@ -323,7 +206,10 @@ func middleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	err := godotenv.Load()
+	var err error
+
+	// Only for local development, does not break but unnecessary
+	err = godotenv.Load()
 	if err != nil {
 		log.Println("Error loading .env file")
 	}
@@ -342,11 +228,19 @@ func main() {
 	}
 
 	ServeMux.HandleFunc("GET /healthz", healthz)
-	ServeMux.Handle("POST /setup", middleware(http.HandlerFunc(getSetupRequest)))
+	ServeMux.Handle("POST /setup", middleware(http.HandlerFunc(getSetup)))
 
 	apiKey = os.Getenv("API_KEY")
 	if apiKey == "" {
-		log.Println("No API key set")
+		log.Fatal("No API key set")
+	}
+
+	endpoint = os.Getenv("AZURE_ENDPOINT")
+	deploymentName = os.Getenv("AZURE_DEPLOYMENT_NAME")
+	azureApiKey = os.Getenv("AZURE_API_KEY")
+
+	if azureApiKey == "" || deploymentName == "" || endpoint == "" {
+		log.Fatal("Some of the required info was empty for Microslop Azure.")
 	}
 
 	// Create cache (before server start)
