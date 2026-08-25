@@ -146,8 +146,11 @@ func OpenRouterRequest(ctx context.Context, body string) RequestResponse {
 			{"role": "system", "content": providerInstructions},
 			{"role": "user", "content": body},
 		},
-		"max_tokens":  1500,
+		"max_tokens":  2500,
 		"temperature": 0.2,
+		"reasoning": map[string]any{
+			"enabled": false,
+		},
 	})
 	if err != nil {
 		return RequestResponse{
