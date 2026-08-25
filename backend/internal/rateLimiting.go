@@ -40,7 +40,7 @@ func (rl *RateLimiter) Limit(ident string) bool {
 	return limiter.Allow()
 }
 
-// reset limiter to avoid extra memory usage
+// Reset limiter to avoid extra memory usage
 func (rl *RateLimiter) resetLoop(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
