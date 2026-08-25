@@ -10,23 +10,36 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/openai/openai-go/v2"
 	"github.com/openai/openai-go/v2/option"
 )
 
+// DisableMut Mutex to handle the above bool value change
+var DisableMut sync.Mutex
+
 const providerInstructions = `
+## Task
 You are an expert Assetto Corsa race engineer generating car setups.
-You will be given a JSON object with car, track, and condition data. Ignore any field that is nil/null. If there is a value that should be considered into the setup, and is important.
-Respond ONLY with a JSON array of {"n":..., "v":...} objects, if there is extra text in the response, it will be discarded, where n is name and v is value, one per field you are changing.
-Only modify setup parameters that already exist in the provided setup. Never invent new parameter names.
-Do not include markdown formatting or any text outside the JSON array.
-Stay within each field's min/max range if provided.
 - If "oversteer" or "understeer" are true, adjust the setup to reduce the one that is true.
 - If both are false, do not apply any oversteer/understeer-specific correction; base the setup purely on the other provided data (track, car, temps, weather, fuel).
 Assume the current setup is only a starting point, not an optimized setup. Analyze every adjustable parameter and modify any parameter that would improve the setup for the given track and conditions. Leave a parameter unchanged only if you determine it is already near its optimal value.
 You should return a modified setup. That setup should be a base stable setup, target a predictable, confidence-inspiring setup suitable for most drivers rather than an aggressive qualifying setup.
+
+## Input
+You will be given a JSON object with car, track, and condition data. Ignore any field that is nil/null. 
+
+## Output format (strict)
+Respond ONLY with a JSON array of {"n":..., "v":...} objects, one per field you are changing, where n is name and v is its new value.
+Only modify setup parameters that already exist in the provided setup. Never invent new parameter names.
+Stay within each field's min/max range if provided.
+
+## Example Output (format only - not real values):
+[{"n":"FRONT_ARB","v":4},{"n":"REAR_TOE","v":-0.15}]
+
+Your entire response must be ONLY the JSON array — nothing before it, nothing after it, no markdown formatting. The first character must be [ and the last character must be ].
 `
 
 const openRouterModel = "nvidia/nemotron-3-ultra-550b-a55b:free"
@@ -133,7 +146,8 @@ func OpenRouterRequest(ctx context.Context, body string) RequestResponse {
 			{"role": "system", "content": providerInstructions},
 			{"role": "user", "content": body},
 		},
-		"max_tokens": 1500,
+		"max_tokens":  1500,
+		"temperature": 0.2,
 	})
 	if err != nil {
 		return RequestResponse{
@@ -247,6 +261,8 @@ func AzureRequest(ctx context.Context, body string) RequestResponse {
 				},
 			},
 		},
+		Temperature:         openai.Float(0.2),
+		MaxCompletionTokens: openai.Int(2500),
 	})
 
 	if err != nil {
@@ -274,4 +290,28 @@ func AzureRequest(ctx context.Context, body string) RequestResponse {
 		Setup: resp.Choices[0].Message.Content,
 		Err:   nil,
 	}
+}
+
+// DisableOpenRouter Disable OpenRouter when daily limit is reached, and set timer to turn on again at 00:00 UTC
+func DisableOpenRouter() {
+	DisableMut.Lock()
+	defer DisableMut.Unlock()
+
+	// Already disabled
+	if !OpenRouterAsProvider.Load() {
+		return
+	}
+
+	OpenRouterAsProvider.Store(false)
+
+	now := time.Now().UTC()
+	nextReset := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
+	wait := nextReset.Sub(now)
+
+	log.Printf("OpenRouter disabled after daily limit was reached. Turning on in %v", wait)
+
+	time.AfterFunc(wait, func() {
+		OpenRouterAsProvider.Store(true)
+		log.Println("Openrouter turned on again.")
+	})
 }

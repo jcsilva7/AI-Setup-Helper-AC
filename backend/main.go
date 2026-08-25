@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -21,11 +22,16 @@ var SetupCache *internal.Cache
 var MachineLimiter *internal.RateLimiter
 var IPLimiter *internal.RateLimiter
 
+// Openrouter key
 var apiKey string
 
+// Azure data
 var endpoint string
 var deploymentName string
 var azureApiKey string
+
+// OpenRouterAsProvider Current main provider
+var OpenRouterAsProvider atomic.Bool
 
 // 64 (KB)
 const maxBodySize int64 = 64
@@ -98,12 +104,38 @@ func getSetup(res http.ResponseWriter, req *http.Request) {
 	var responseSetup string
 
 	// Cache miss, request to provider
-	openRouterResponse := OpenRouterRequest(req.Context(), bodyString)
-	if openRouterResponse.Err != nil {
-		//res.WriteHeader(openRouterResponse.StatusCode)
-		log.Printf("OpenRouter Error -> %s\n", openRouterResponse.Err)
+	if OpenRouterAsProvider.Load() {
+		openRouterResponse := OpenRouterRequest(req.Context(), bodyString)
+		if openRouterResponse.Err != nil {
+			//res.WriteHeader(openRouterResponse.StatusCode)
+			log.Printf("OpenRouter Error -> %s\n", openRouterResponse.Err)
 
-		// Try with Microslop alternative (Always fallback to this)
+			// Daily limit reached, switch to azure only (and schedule the switch back)
+			if openRouterResponse.StatusCode != nil && *openRouterResponse.StatusCode == 429 &&
+				strings.Contains(openRouterResponse.Err.Error(), "free-models-per-day") {
+				DisableOpenRouter()
+			}
+
+			// Try with Microslop alternative (Always fallback to this)
+			azureResponse := AzureRequest(req.Context(), bodyString)
+			if azureResponse.Err != nil {
+				if azureResponse.StatusCode != nil {
+					res.WriteHeader(*azureResponse.StatusCode)
+				} else {
+					res.WriteHeader(http.StatusInternalServerError)
+				}
+
+				log.Printf("Azure Error -> %s\n", azureResponse.Err)
+				return
+			}
+
+			responseSetup = azureResponse.Setup
+
+		} else {
+			responseSetup = openRouterResponse.Setup
+		}
+	} else {
+		// Straight to azure (OpenRouter daily usage maxed out)
 		azureResponse := AzureRequest(req.Context(), bodyString)
 		if azureResponse.Err != nil {
 			if azureResponse.StatusCode != nil {
@@ -117,9 +149,6 @@ func getSetup(res http.ResponseWriter, req *http.Request) {
 		}
 
 		responseSetup = azureResponse.Setup
-
-	} else {
-		responseSetup = openRouterResponse.Setup
 	}
 
 	// Remove hallucinated extra chars
@@ -127,7 +156,7 @@ func getSetup(res http.ResponseWriter, req *http.Request) {
 
 	var setupChanges []map[string]any
 	if err := json.Unmarshal([]byte(cleanContent), &setupChanges); err != nil {
-		log.Printf("Provider content is not a valid JSON array: %v\n", err)
+		log.Printf("Provider content is not a valid JSON array: %v\nResponse: %v\n", err, cleanContent)
 		res.WriteHeader(http.StatusBadGateway)
 		return
 	}
@@ -242,6 +271,8 @@ func main() {
 	if azureApiKey == "" || deploymentName == "" || endpoint == "" {
 		log.Fatal("Some of the required info was empty for Microslop Azure.")
 	}
+
+	OpenRouterAsProvider.Store(true)
 
 	// Create cache (before server start)
 	SetupCache = internal.NewCache(24*time.Hour, 1*time.Hour)
