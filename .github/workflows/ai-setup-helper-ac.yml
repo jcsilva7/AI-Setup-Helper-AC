@@ -45,4 +45,4 @@ jobs:
           cache: true
 
       - name: golangci-lint
-        uses: golangci-lint-action@v7
+        uses: golangci-lint/golangci-lint-action@v7
