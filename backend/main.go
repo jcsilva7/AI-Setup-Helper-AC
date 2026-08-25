@@ -3,6 +3,7 @@ package main
 import (
 	"ai-setup-helper-backend/internal"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -72,6 +73,20 @@ func stripCodeFence(s string) string {
 	return strings.TrimSpace(s)
 }
 
+// Check if the setup is a valid json (by unpacking it into a map) and return the map with the data
+func validateSetup(responseSetup string) (bool, []map[string]any) {
+	// Remove hallucinated extra chars
+	cleanContent := stripCodeFence(responseSetup)
+
+	var setupChanges []map[string]any
+	if err := json.Unmarshal([]byte(cleanContent), &setupChanges); err != nil {
+		log.Printf("Provider content is not a valid JSON array: %v\nResponse: %v\n", err, cleanContent)
+		return false, []map[string]any{}
+	}
+
+	return true, setupChanges
+}
+
 // Make the request to get and return the setup from the LLM
 func getSetup(res http.ResponseWriter, req *http.Request) {
 	stuff := handleRequest(req)
@@ -101,13 +116,20 @@ func getSetup(res http.ResponseWriter, req *http.Request) {
 
 	bodyString := stuff.BodyString
 
-	var responseSetup string
+	var setupChanges []map[string]any
+	var isSetupValid bool
 
 	// Cache miss, request to provider
 	if OpenRouterAsProvider.Load() {
 		openRouterResponse := OpenRouterRequest(req.Context(), bodyString)
-		if openRouterResponse.Err != nil {
-			//res.WriteHeader(openRouterResponse.StatusCode)
+
+		isSetupValid, setupChanges = validateSetup(openRouterResponse.Setup)
+
+		if openRouterResponse.Err != nil || !isSetupValid {
+			if openRouterResponse.Err == nil {
+				openRouterResponse.Err = fmt.Errorf("returned setup was not valid JSON")
+			}
+
 			log.Printf("OpenRouter Error -> %s\n", openRouterResponse.Err)
 
 			// Daily limit reached, switch to azure only (and schedule the switch back)
@@ -129,38 +151,36 @@ func getSetup(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			responseSetup = azureResponse.Setup
+			isSetupValid, setupChanges = validateSetup(azureResponse.Setup)
+			if !isSetupValid {
+				res.WriteHeader(http.StatusBadGateway)
+				log.Println("Neither provider returned a valid JSON setup...")
+				return
+			}
 
-		} else {
-			responseSetup = openRouterResponse.Setup
 		}
 	} else {
 		// Straight to azure (OpenRouter daily usage maxed out)
 		azureResponse := AzureRequest(req.Context(), bodyString)
-		if azureResponse.Err != nil {
+
+		isSetupValid, setupChanges = validateSetup(azureResponse.Setup)
+
+		if azureResponse.Err != nil || !isSetupValid {
 			if azureResponse.StatusCode != nil {
 				res.WriteHeader(*azureResponse.StatusCode)
 			} else {
-				res.WriteHeader(http.StatusInternalServerError)
+				res.WriteHeader(http.StatusBadGateway)
 			}
 
+			if azureResponse.Err == nil {
+				azureResponse.Err = fmt.Errorf("returned setup was not valid JSON")
+			}
 			log.Printf("Azure Error -> %s\n", azureResponse.Err)
 			return
 		}
-
-		responseSetup = azureResponse.Setup
 	}
 
-	// Remove hallucinated extra chars
-	cleanContent := stripCodeFence(responseSetup)
-
-	var setupChanges []map[string]any
-	if err := json.Unmarshal([]byte(cleanContent), &setupChanges); err != nil {
-		log.Printf("Provider content is not a valid JSON array: %v\nResponse: %v\n", err, cleanContent)
-		res.WriteHeader(http.StatusBadGateway)
-		return
-	}
-
+	// Turn the setup into json again to send to the app
 	content, err := json.Marshal(setupChanges)
 	if err != nil {
 		log.Printf("Error encoding setup response: %v\n", err)
