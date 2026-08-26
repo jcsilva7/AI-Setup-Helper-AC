@@ -41,7 +41,7 @@ getHash()
 
 -- Set timeout times in ms (first three are default values, last is the response, and only one that actually matters)
 -- 60s is enough to take into account the app cold start and the api response (hopefully)
-web.timeouts(4000, 10000, 30000, 60000)
+web.timeouts(4000, 10000, 30000, 75000)
 
 -- Send a waking call to the backend app to initiate the cold start, before the user makes a request
 if App_Settings.common then
