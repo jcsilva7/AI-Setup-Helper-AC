@@ -98,16 +98,22 @@ function R.make_request(common, data, api_key, callback)
                     elseif response.status == 401 then
                         callback("Unauthorized. Check your API key.", false)
                     elseif response.status == 502 then
-                        callback("Chosen provider is down. Try again later.", false)
+                        callback("Chosen provider is down or not responding. Try again later.", false)
                     elseif response.status == 402 then
-                        callback("One of us screwed up. And ran out of credits. (If you use the common provider, it was me, sorry)", false)
+                        callback("One of us screwed up. And ran out of credits.\n(If you use the common provider, it was me, sorry)", false)
                     elseif response.status == 413 then
                         callback("Body size too large", false)
+                    elseif response.status == 204 then
+                        callback("The stupid AI responded, but with nothing :|", false)
+                    elseif response.status == 500 then
+                        callback("Something broke in the app. Try again in a bit", false)
+                    elseif response.status == 400 then
+                        callback("Bad request. Check your input.", false)
                     else
                         callback("Request failed. Try again in a bit", false)
                     end
                 else
-                    callback(err or "No response from provider.", false)
+                    callback(err or "Could not make the request. Try again in a bit.", false)
                 end
 
                 return

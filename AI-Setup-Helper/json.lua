@@ -1,49 +1,9 @@
--- Module options:
-local always_try_using_lpeg = true
-local register_global_module_table = false
-local global_module_name = 'json'
+-- Minimal JSON module (based on dkjson by David Kolf), trimmed to only
+-- expose json.encode and json.decode, plus json.null for representing
+-- JSON null values.
 
---[==[
-
-David Kolf's JSON module for Lua 5.1/5.2
-
-Version 2.5
-
-
-For the documentation see the corresponding readme.txt or visit
-<http://dkolf.de/src/dkjson-lua.fsl/>.
-
-You can contact the author by sending an e-mail to 'david' at the
-domain 'dkolf.de'.
-
-
-Copyright (C) 2010-2014 David Heiko Kolf
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
---]==]
-
--- global dependencies:
-local pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset =
-      pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset
+local pairs, type, tostring, tonumber, getmetatable, setmetatable =
+      pairs, type, tostring, tonumber, getmetatable, setmetatable
 local error, require, pcall, select = error, require, pcall, select
 local floor, huge = math.floor, math.huge
 local strrep, gsub, strsub, strbyte, strchar, strfind, strlen, strformat =
@@ -52,17 +12,11 @@ local strrep, gsub, strsub, strbyte, strchar, strfind, strlen, strformat =
 local strmatch = string.match
 local concat = table.concat
 
-local json = { version = "dkjson 2.5" }
-
-if register_global_module_table then
-  _G[global_module_name] = json
-end
-
-local _ENV = nil -- blocking globals in Lua 5.2
+local json = {}
 
 pcall (function()
-  -- Enable access to blocked metatables.
-  -- Don't worry, this module doesn't change anything in them.
+  -- Enable access to blocked metatables (needed so custom __tojson
+  -- metamethods can be found even on protected tables).
   local debmeta = require "debug".getmetatable
   if debmeta then getmetatable = debmeta end
 end)
@@ -131,9 +85,6 @@ local function escapeutf8 (uchar)
 end
 
 local function fsub (str, pattern, repl)
-  -- gsub always builds a new string in a buffer, even when no match
-  -- exists. First using find should be more efficient when most strings
-  -- don't contain the pattern.
   if strfind (str, pattern) then
     return gsub (str, pattern, repl)
   else
@@ -142,7 +93,6 @@ local function fsub (str, pattern, repl)
 end
 
 local function quotestring (value)
-  -- based on the regexp "escapable" in https://github.com/douglascrockford/JSON-js
   value = fsub (value, "[%z\1-\31\"\\\127]", escapeutf8)
   if strfind (value, "[\194\216\220\225\226\239]") then
     value = fsub (value, "\194[\128-\159\173]", escapeutf8)
@@ -156,9 +106,8 @@ local function quotestring (value)
   end
   return "\"" .. value .. "\""
 end
-json.quotestring = quotestring
 
-local function replace(str, o, n)
+local function replace (str, o, n)
   local i, j = strfind (str, o, 1, true)
   if i then
     return strsub(str, 1, i-1) .. n .. strsub(str, j+1, -1)
@@ -172,7 +121,6 @@ local decpoint, numfilter
 
 local function updatedecpoint ()
   decpoint = strmatch(tostring(0.5), "([^05+])")
-  -- build a filter that can be used to remove group separators
   numfilter = "[^0-9%-%+eE" .. gsub(decpoint, "[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0") .. "]+"
 end
 
@@ -198,13 +146,6 @@ local function addnewline2 (level, buffer, buflen)
   return buflen
 end
 
-function json.addnewline (state)
-  if state.indent then
-    state.bufferlen = addnewline2 (state.level or 0,
-                           state.buffer, state.bufferlen or #(state.buffer))
-  end
-end
-
 local encode2 -- forward declaration
 
 local function addpair (key, value, prev, indent, level, buffer, buflen, tables, globalorder, state)
@@ -224,7 +165,7 @@ local function addpair (key, value, prev, indent, level, buffer, buflen, tables,
   return encode2 (value, indent, level, buffer, buflen + 2, tables, globalorder, state)
 end
 
-local function appendcustom(res, buffer, state)
+local function appendcustom (res, buffer, state)
   local buflen = state.bufferlen
   if type (res) == 'string' then
     buflen = buflen + 1
@@ -233,7 +174,7 @@ local function appendcustom(res, buffer, state)
   return buflen
 end
 
-local function exception(reason, value, state, buffer, buflen, defaultmessage)
+local function exception (reason, value, state, buffer, buflen, defaultmessage)
   defaultmessage = defaultmessage or reason
   local handler = state.exception
   if not handler then
@@ -242,12 +183,8 @@ local function exception(reason, value, state, buffer, buflen, defaultmessage)
     state.bufferlen = buflen
     local ret, msg = handler (reason, value, state, defaultmessage)
     if not ret then return nil, msg or defaultmessage end
-    return appendcustom(ret, buffer, state)
+    return appendcustom (ret, buffer, state)
   end
-end
-
-function json.encodeexception(reason, value, state, defaultmessage)
-  return quotestring("<" .. defaultmessage .. ">")
 end
 
 encode2 = function (value, indent, level, buffer, buflen, tables, globalorder, state)
@@ -257,21 +194,20 @@ encode2 = function (value, indent, level, buffer, buflen, tables, globalorder, s
   local valtojson = valmeta and valmeta.__tojson
   if valtojson then
     if tables[value] then
-      return exception('reference cycle', value, state, buffer, buflen)
+      return exception ('reference cycle', value, state, buffer, buflen)
     end
     tables[value] = true
     state.bufferlen = buflen
     local ret, msg = valtojson (value, state)
-    if not ret then return exception('custom encoder failed', value, state, buffer, buflen, msg) end
+    if not ret then return exception ('custom encoder failed', value, state, buffer, buflen, msg) end
     tables[value] = nil
-    buflen = appendcustom(ret, buffer, state)
+    buflen = appendcustom (ret, buffer, state)
   elseif value == nil then
     buflen = buflen + 1
     buffer[buflen] = "null"
   elseif valtype == 'number' then
     local s
     if value ~= value or value >= huge or -value >= huge then
-      -- This is the behaviour of the original JSON implementation.
       s = "null"
     else
       s = num2str (value)
@@ -286,7 +222,7 @@ encode2 = function (value, indent, level, buffer, buflen, tables, globalorder, s
     buffer[buflen] = quotestring (value)
   elseif valtype == 'table' then
     if tables[value] then
-      return exception('reference cycle', value, state, buffer, buflen)
+      return exception ('reference cycle', value, state, buffer, buflen)
     end
     tables[value] = true
     level = level + 1
@@ -322,21 +258,21 @@ encode2 = function (value, indent, level, buffer, buflen, tables, globalorder, s
           if v then
             used[k] = true
             buflen, msg = addpair (k, v, prev, indent, level, buffer, buflen, tables, globalorder, state)
-            prev = true -- add a seperator before the next element
+            prev = true
           end
         end
         for k,v in pairs (value) do
           if not used[k] then
             buflen, msg = addpair (k, v, prev, indent, level, buffer, buflen, tables, globalorder, state)
             if not buflen then return nil, msg end
-            prev = true -- add a seperator before the next element
+            prev = true
           end
         end
       else -- unordered
         for k,v in pairs (value) do
           buflen, msg = addpair (k, v, prev, indent, level, buffer, buflen, tables, globalorder, state)
           if not buflen then return nil, msg end
-          prev = true -- add a seperator before the next element
+          prev = true
         end
       end
       if indent then
@@ -398,7 +334,6 @@ local function scanwhite (str, pos)
     if not pos then return nil end
     local sub2 = strsub (str, pos, pos + 1)
     if sub2 == "\239\187" and strsub (str, pos + 2, pos + 2) == "\191" then
-      -- UTF-8 Byte Order Mark
       pos = pos + 3
     elseif sub2 == "//" then
       pos = strfind (str, "[\n\r]", pos + 2)
@@ -463,14 +398,12 @@ local function scanstring (str, pos)
         if value then
           local value2
           if 0xD800 <= value and value <= 0xDBff then
-            -- we have the high surrogate of UTF-16. Check if there is a
-            -- low surrogate escaped nearby to combine them.
             if strsub (str, nextpos + 6, nextpos + 7) == "\\u" then
               value2 = tonumber (strsub (str, nextpos + 8, nextpos + 11), 16)
               if value2 and 0xDC00 <= value2 and value2 <= 0xDFFF then
                 value = (value - 0xD800)  * 0x400 + (value2 - 0xDC00) + 0x10000
               else
-                value2 = nil -- in case it was out of range for a low surrogate
+                value2 = nil
               end
             end
           end
@@ -504,7 +437,6 @@ end
 local scanvalue -- forward declaration
 
 local function scantable (what, closechar, str, startpos, nullval, objectmeta, arraymeta)
-  local len = strlen (str)
   local tbl, n = {}, 0
   local pos = startpos + 1
   if what == 'object' then
@@ -584,7 +516,7 @@ scanvalue = function (str, pos, nullval, objectmeta, arraymeta)
   end
 end
 
-local function optionalmetatables(...)
+local function optionalmetatables (...)
   if select("#", ...) > 0 then
     return ...
   else
@@ -597,118 +529,4 @@ function json.decode (str, pos, nullval, ...)
   return scanvalue (str, pos, nullval, objectmeta, arraymeta)
 end
 
-function json.use_lpeg ()
-  local g = require ("lpeg")
-
-  if g.version() == "0.11" then
-    error "due to a bug in LPeg 0.11, it cannot be used for JSON matching"
-  end
-
-  local pegmatch = g.match
-  local P, S, R = g.P, g.S, g.R
-
-  local function ErrorCall (str, pos, msg, state)
-    if not state.msg then
-      state.msg = msg .. " at " .. loc (str, pos)
-      state.pos = pos
-    end
-    return false
-  end
-
-  local function Err (msg)
-    return g.Cmt (g.Cc (msg) * g.Carg (2), ErrorCall)
-  end
-
-  local SingleLineComment = P"//" * (1 - S"\n\r")^0
-  local MultiLineComment = P"/*" * (1 - P"*/")^0 * P"*/"
-  local Space = (S" \n\r\t" + P"\239\187\191" + SingleLineComment + MultiLineComment)^0
-
-  local PlainChar = 1 - S"\"\\\n\r"
-  local EscapeSequence = (P"\\" * g.C (S"\"\\/bfnrt" + Err "unsupported escape sequence")) / escapechars
-  local HexDigit = R("09", "af", "AF")
-  local function UTF16Surrogate (match, pos, high, low)
-    high, low = tonumber (high, 16), tonumber (low, 16)
-    if 0xD800 <= high and high <= 0xDBff and 0xDC00 <= low and low <= 0xDFFF then
-      return true, unichar ((high - 0xD800)  * 0x400 + (low - 0xDC00) + 0x10000)
-    else
-      return false
-    end
-  end
-  local function UTF16BMP (hex)
-    return unichar (tonumber (hex, 16))
-  end
-  local U16Sequence = (P"\\u" * g.C (HexDigit * HexDigit * HexDigit * HexDigit))
-  local UnicodeEscape = g.Cmt (U16Sequence * U16Sequence, UTF16Surrogate) + U16Sequence/UTF16BMP
-  local Char = UnicodeEscape + EscapeSequence + PlainChar
-  local String = P"\"" * g.Cs (Char ^ 0) * (P"\"" + Err "unterminated string")
-  local Integer = P"-"^(-1) * (P"0" + (R"19" * R"09"^0))
-  local Fractal = P"." * R"09"^0
-  local Exponent = (S"eE") * (S"+-")^(-1) * R"09"^1
-  local Number = (Integer * Fractal^(-1) * Exponent^(-1))/str2num
-  local Constant = P"true" * g.Cc (true) + P"false" * g.Cc (false) + P"null" * g.Carg (1)
-  local SimpleValue = Number + String + Constant
-  local ArrayContent, ObjectContent
-
-  -- The functions parsearray and parseobject parse only a single value/pair
-  -- at a time and store them directly to avoid hitting the LPeg limits.
-  local function parsearray (str, pos, nullval, state)
-    local obj, cont
-    local npos
-    local t, nt = {}, 0
-    repeat
-      obj, cont, npos = pegmatch (ArrayContent, str, pos, nullval, state)
-      if not npos then break end
-      pos = npos
-      nt = nt + 1
-      t[nt] = obj
-    until cont == 'last'
-    return pos, setmetatable (t, state.arraymeta)
-  end
-
-  local function parseobject (str, pos, nullval, state)
-    local obj, key, cont
-    local npos
-    local t = {}
-    repeat
-      key, obj, cont, npos = pegmatch (ObjectContent, str, pos, nullval, state)
-      if not npos then break end
-      pos = npos
-      t[key] = obj
-    until cont == 'last'
-    return pos, setmetatable (t, state.objectmeta)
-  end
-
-  local Array = P"[" * g.Cmt (g.Carg(1) * g.Carg(2), parsearray) * Space * (P"]" + Err "']' expected")
-  local Object = P"{" * g.Cmt (g.Carg(1) * g.Carg(2), parseobject) * Space * (P"}" + Err "'}' expected")
-  local Value = Space * (Array + Object + SimpleValue)
-  local ExpectedValue = Value + Space * Err "value expected"
-  ArrayContent = Value * Space * (P"," * g.Cc'cont' + g.Cc'last') * g.Cp()
-  local Pair = g.Cg (Space * String * Space * (P":" + Err "colon expected") * ExpectedValue)
-  ObjectContent = Pair * Space * (P"," * g.Cc'cont' + g.Cc'last') * g.Cp()
-  local DecodeValue = ExpectedValue * g.Cp ()
-
-  function json.decode (str, pos, nullval, ...)
-    local state = {}
-    state.objectmeta, state.arraymeta = optionalmetatables(...)
-    local obj, retpos = pegmatch (DecodeValue, str, pos, nullval, state)
-    if state.msg then
-      return nil, state.pos, state.msg
-    else
-      return obj, retpos
-    end
-  end
-
-  -- use this function only once:
-  json.use_lpeg = function () return json end
-
-  json.using_lpeg = true
-
-  return json -- so you can get the module using json = require "dkjson".use_lpeg()
-end
-
-if always_try_using_lpeg then
-  pcall (json.use_lpeg)
-end
-
 return json
-

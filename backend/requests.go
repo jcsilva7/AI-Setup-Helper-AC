@@ -229,7 +229,7 @@ func OpenRouterRequest(ctx context.Context, body string) RequestResponse {
 	// Provider returned nothing
 	if len(providerResp.Choices) == 0 {
 		return RequestResponse{
-			StatusCode: new(http.StatusBadGateway),
+			StatusCode: new(http.StatusNoContent),
 			Err:        fmt.Errorf("provider returned no responses"),
 		}
 	}
@@ -284,7 +284,7 @@ func AzureRequest(ctx context.Context, body string) RequestResponse {
 
 	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
 		return RequestResponse{
-			StatusCode: new(http.StatusBadGateway),
+			StatusCode: new(http.StatusNoContent),
 			Err:        fmt.Errorf("provider returned no responses"),
 		}
 	}
