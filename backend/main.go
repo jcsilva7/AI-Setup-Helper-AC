@@ -292,7 +292,7 @@ func main() {
 		log.Fatal("Some of the required info was empty for Microslop Azure.")
 	}
 
-	OpenRouterAsProvider.Store(true)
+	OpenRouterAsProvider.Store(false)
 
 	// Create cache (before server start)
 	SetupCache = internal.NewCache(24*time.Hour, 1*time.Hour)
