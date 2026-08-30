@@ -28,6 +28,9 @@ Icon maker
 Also, if you really like this app, you can support it :)
 https://ko-fi.com/jcsilva
 
+Link to the mod in overtake.gg:
+https://www.overtake.gg/downloads/ai-setup-helper.86210/ (200+ downloads)
+
 My other mod:
 https://www.overtake.gg/downloads/battery-helper.85815/
 
