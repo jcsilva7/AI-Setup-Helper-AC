@@ -23,6 +23,9 @@ var SetupCache *internal.Cache
 var MachineLimiter *internal.RateLimiter
 var IPLimiter *internal.RateLimiter
 
+// DailyLimiter limit daily requests
+var DailyLimiter *internal.RateLimiter
+
 // Openrouter key
 var apiKey string
 
@@ -234,6 +237,12 @@ func middleware(next http.Handler) http.Handler {
 			return
 		}
 
+		if !DailyLimiter.Limit(ip) {
+			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			log.Println("Daily limit exceeded: ", ip)
+			return
+		}
+
 		if !MachineLimiter.Limit(machineHash) {
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			log.Println("Rate limit exceeded: ", machineHash, ip)
@@ -300,6 +309,7 @@ func main() {
 	// Create rate limiter objects
 	MachineLimiter = internal.NewRateLimiter(5, 3, 24*time.Hour)
 	IPLimiter = internal.NewRateLimiter(15, 5, 24*time.Hour)
+	DailyLimiter = internal.NewDailyRateLimiter(50)
 
 	// Load blacklist
 	internal.LoadBlacklist("blacklist.txt")

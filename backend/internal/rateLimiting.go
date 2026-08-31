@@ -27,6 +27,19 @@ func NewRateLimiter(reqsPerMin float64, burst int, resetInterval time.Duration) 
 	return rl
 }
 
+// NewDailyRateLimiter Creates a new daily Limiter
+func NewDailyRateLimiter(reqsPerDay float64) *RateLimiter {
+	rl := &RateLimiter{
+		limiters: make(map[string]*rate.Limiter),
+		burst:    10,
+		r:        rate.Limit(reqsPerDay / 86400),
+	}
+
+	go rl.resetLoop(24 * time.Hour)
+
+	return rl
+}
+
 // Limit Check if request should be allowed or not
 func (rl *RateLimiter) Limit(ident string) bool {
 	rl.mut.Lock()
