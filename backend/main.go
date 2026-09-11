@@ -37,8 +37,8 @@ var azureApiKey string
 // OpenRouterAsProvider Current main provider
 var OpenRouterAsProvider atomic.Bool
 
-// 96 (KB)
-const maxBodySize int64 = 96
+// 128 (KB)
+const maxBodySize int64 = 128
 
 // SetupRequest data to check cache
 type SetupRequest struct {
