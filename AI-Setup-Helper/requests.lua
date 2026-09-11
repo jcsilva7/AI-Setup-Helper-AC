@@ -16,33 +16,24 @@ local function direct_payload(data, api_key)
     -- deepseek-v4-flash
     -- deepseek-v4-pro
     -- Gemini 2.5 Flash
-    local model = "google/gemini-3.7-flash"
-    local prompt = "You are an expert Assetto Corsa race engineer generating car setups.\n" ..
-        "You will be given a JSON object with car, track, and condition data. Ignore any field that is nil/null. If there is a value that should be considered into the setup, and is important.\n" ..
-        "Respond ONLY with a JSON array of {\"n\":..., \"v\":...} objects, where n is name and v is value, one per field you are changing. \n" ..
-        "Only modify setup parameters that already exist in the provided setup. Never invent new parameter names.\n" ..
-        "Do not include markdown formatting or any text outside the JSON array.\n" ..
-        "Stay within each field's min/max range if provided.\n\n" ..
-        "- If \"oversteer\" or \"understeer\" are true, adjust the setup to reduce the one that is true.\n" ..
-        "- If both are false, do not apply any oversteer/understeer-specific correction; base the setup purely on the " ..
-        "other provided data (track, car, temps, weather, fuel).\n" ..
-        "Assume the current setup is only a starting point, not an optimized setup. Analyze every adjustable parameter and modify any parameter that would improve the setup for the given track and conditions. Leave a parameter unchanged only if you determine it is already near its optimal value.\n" ..
-        "You should return a modified setup. That setup should be a base stable setup, target a predictable, confidence-inspiring setup suitable for most drivers rather than an aggressive qualifying setup.\n" ..
-        "Data:\n" .. data
+    local prompt = (App_Settings.prompt or "") .. data
 
-    local payload = json.encode({
-        model = model,
+    local payload_table = {
+        model = App_Settings.model or "google/gemini-3.7-flash",
         messages = {
-            {
-                role = "user",
-                content = prompt
-            }
+            { role = "system", content = App_Settings.instructions or "" },
+            { role = "user", content = prompt }
         },
-        max_tokens = 1500,
-        reasoning = {
-            enabled = true
-        }
-    })
+        max_tokens = 2500,
+        temperature = 0.2
+    }
+
+    -- Gemini requires reasoning, but others just start yapping and return garbage instead of json
+    if (App_Settings.model or ""):find("gemini") then
+        payload_table.reasoning = { enabled = true }
+    end
+
+    local payload = json.encode(payload_table)
 
     return url, headers, payload
 end

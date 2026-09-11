@@ -1,6 +1,27 @@
 App_Settings = ac.storage({
     common = true,
     api_key = "",
+    instructions = [[## Task
+You are an expert Assetto Corsa race engineer generating car setups.
+- If "oversteer" or "understeer" are true, adjust the setup to reduce the one that is true.
+- If both are false, do not apply any oversteer/understeer-specific correction; base the setup purely on the other provided data (track, car, temps, weather, fuel).
+Assume the current setup is only a starting point, not an optimized setup. Analyze every adjustable parameter and modify any parameter that would improve the setup for the given track and conditions. Leave a parameter unchanged only if you determine it is already near its optimal value.
+You should return a modified setup. That setup should be a base stable setup, target a predictable, confidence-inspiring setup suitable for most drivers rather than an aggressive qualifying setup.
+
+## Input
+You will be given a JSON object with car, track, and condition data. Ignore any field that is nil/null.
+
+## Output format (strict)
+Respond ONLY with a JSON array of {"n":..., "v":...} objects, one per field you are changing, where n is name and v is its new value.
+Only modify setup parameters that already exist in the provided setup. Never invent new parameter names.
+Stay within each field's min/max range if provided.
+
+## Example Output (format only - not real values):
+[{"n":"FRONT_ARB","v":4},{"n":"REAR_TOE","v":-0.15}]
+
+Your entire response must be ONLY the JSON array - nothing before it, nothing after it, no markdown formatting. The first character must be [ and the last character must be ].]],
+    prompt = "Data:\n",
+    model = "google/gemini-3.7-flash",
 }, "AISetupHelper.Settings")
 
 -- Json
@@ -118,6 +139,7 @@ local function setupSpinnersToTable(spinners)
     for i, spinner in ipairs(spinners) do
         data[i] = {
             n = spinner.name,
+            label = spinner.label,
             v = spinner.value,
             min = spinner.min,
             max = spinner.max,
@@ -369,6 +391,36 @@ function script.windowSettings(dt)
     local newKey, changedKey = ui.inputText('##apiKey', App_Settings.api_key or "", ui.InputTextFlags.Password)
     if changedKey then
         App_Settings.api_key = newKey
+    end
+
+    ui.newLine()
+    ui.text('Model')
+    local newModel, changedModel = ui.inputText('##model', App_Settings.model or "")
+    if changedModel then
+        App_Settings.model = newModel
+    end
+
+    ui.newLine()
+    ui.text('Instructions')
+    local newInstructions, changedInstructions = ui.inputText(
+        '##instructions',
+        App_Settings.instructions or "",
+        ui.InputTextFlags.Multiline,
+        vec2(-1, 220)
+    )
+    if changedInstructions then
+        App_Settings.instructions = newInstructions
+    end
+
+    ui.text('Prompt')
+    local newPrompt, changedPrompt = ui.inputText(
+        '##prompt',
+        App_Settings.prompt or "",
+        ui.InputTextFlags.Multiline,
+        vec2(-1, 110)
+    )
+    if changedPrompt then
+        App_Settings.prompt = newPrompt
     end
 
     ui.newLine()
