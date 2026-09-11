@@ -25,9 +25,6 @@ Icon maker
 
 <a href="https://www.flaticon.com/free-icons/repair" title="repair icons">Repair icons created by Eucalyp - Flaticon</a>
 
-Also, if you really like this app, you can support it :)
-https://ko-fi.com/jcsilva
-
 Link to the mod in overtake.gg:
 https://www.overtake.gg/downloads/ai-setup-helper.86210/ (200+ downloads)
 
