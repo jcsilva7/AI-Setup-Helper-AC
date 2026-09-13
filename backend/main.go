@@ -123,64 +123,51 @@ func getSetup(res http.ResponseWriter, req *http.Request) {
 	var isSetupValid bool
 
 	// Cache miss, request to provider
-	if OpenRouterAsProvider.Load() {
-		openRouterResponse := OpenRouterRequest(req.Context(), bodyString)
 
-		isSetupValid, setupChanges = validateSetup(openRouterResponse.Setup)
+	// Previously was Openrouter and then fallback to Azure
+	// Now Azure and fallback to Openrouter
+	azureResponse := AzureRequest(req.Context(), bodyString)
+	isSetupValid, setupChanges = validateSetup(azureResponse.Setup)
 
-		if openRouterResponse.Err != nil || !isSetupValid {
-			if openRouterResponse.Err == nil {
-				openRouterResponse.Err = fmt.Errorf("returned setup was not valid JSON")
-			}
+	if azureResponse.Err != nil || !isSetupValid {
+		if azureResponse.Err == nil {
+			azureResponse.Err = fmt.Errorf("returned setup was not valid JSON")
+		}
+		log.Printf("Azure Error -> %s\n", azureResponse.Err)
 
-			log.Printf("OpenRouter Error -> %s\n", openRouterResponse.Err)
+		if OpenRouterAsProvider.Load() {
+			openRouterResponse := OpenRouterRequest(req.Context(), bodyString)
 
-			// Daily limit reached, switch to azure only (and schedule the switch back)
-			if openRouterResponse.StatusCode != nil && *openRouterResponse.StatusCode == 429 &&
-				strings.Contains(openRouterResponse.Err.Error(), "free-models-per-day") {
-				DisableOpenRouter()
-			}
+			isSetupValid, setupChanges = validateSetup(openRouterResponse.Setup)
 
-			// Try with Microslop alternative (Always fallback to this)
-			azureResponse := AzureRequest(req.Context(), bodyString)
-			if azureResponse.Err != nil {
-				if azureResponse.StatusCode != nil {
-					res.WriteHeader(*azureResponse.StatusCode)
-				} else {
-					res.WriteHeader(http.StatusInternalServerError)
+			if openRouterResponse.Err != nil || !isSetupValid {
+				if openRouterResponse.Err == nil {
+					openRouterResponse.Err = fmt.Errorf("returned setup was not valid JSON")
 				}
 
-				log.Printf("Azure Error -> %s\n", azureResponse.Err)
-				return
-			}
+				log.Printf("OpenRouter Error -> %s\n", openRouterResponse.Err)
 
-			isSetupValid, setupChanges = validateSetup(azureResponse.Setup)
-			if !isSetupValid {
+				// Daily limit reached, switch to azure only (and schedule the switch back)
+				if openRouterResponse.StatusCode != nil && *openRouterResponse.StatusCode == 429 &&
+					strings.Contains(openRouterResponse.Err.Error(), "free-models-per-day") {
+					DisableOpenRouter()
+				}
+
+				// Finish error
 				res.WriteHeader(http.StatusBadGateway)
-				log.Println("Neither provider returned a valid JSON setup...")
+				log.Println("No provider returned a valid JSON setup...")
 				return
 			}
-
-		}
-	} else {
-		// Straight to azure (OpenRouter daily usage maxed out)
-		azureResponse := AzureRequest(req.Context(), bodyString)
-
-		isSetupValid, setupChanges = validateSetup(azureResponse.Setup)
-
-		if azureResponse.Err != nil || !isSetupValid {
+		} else {
 			if azureResponse.StatusCode != nil {
 				res.WriteHeader(*azureResponse.StatusCode)
 			} else {
-				res.WriteHeader(http.StatusBadGateway)
+				res.WriteHeader(http.StatusInternalServerError)
 			}
 
-			if azureResponse.Err == nil {
-				azureResponse.Err = fmt.Errorf("returned setup was not valid JSON")
-			}
-			log.Printf("Azure Error -> %s\n", azureResponse.Err)
 			return
 		}
+
 	}
 
 	// Turn the setup into json again to send to the app
@@ -301,7 +288,7 @@ func main() {
 		log.Fatal("Some of the required info was empty for Microslop Azure.")
 	}
 
-	OpenRouterAsProvider.Store(false)
+	OpenRouterAsProvider.Store(true)
 
 	// Create cache (before server start)
 	SetupCache = internal.NewCache(24*time.Hour, 1*time.Hour)
@@ -309,7 +296,7 @@ func main() {
 	// Create rate limiter objects
 	MachineLimiter = internal.NewRateLimiter(5, 3, 24*time.Hour)
 	IPLimiter = internal.NewRateLimiter(15, 5, 24*time.Hour)
-	DailyLimiter = internal.NewDailyRateLimiter(50)
+	DailyLimiter = internal.NewDailyRateLimiter(60)
 
 	// Load blacklist
 	internal.LoadBlacklist("blacklist.txt")
