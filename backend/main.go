@@ -296,7 +296,7 @@ func main() {
 	// Create rate limiter objects
 	MachineLimiter = internal.NewRateLimiter(5, 3, 24*time.Hour)
 	IPLimiter = internal.NewRateLimiter(15, 5, 24*time.Hour)
-	DailyLimiter = internal.NewDailyRateLimiter(60)
+	DailyLimiter = internal.NewDailyRateLimiter(30)
 
 	// Load blacklist
 	internal.LoadBlacklist("blacklist.txt")
