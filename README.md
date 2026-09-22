@@ -1,5 +1,8 @@
 # AI-Setup-Helper-AC
 
+[![Test backend (lint and compile for now)](https://github.com/jcsilva7/AI-Setup-Helper-AC/actions/workflows/check.yaml/badge.svg)](https://github.com/jcsilva7/AI-Setup-Helper-AC/actions/workflows/check.yaml)
+
+
 An Assetto Corsa Lua app to use AI to generate setups for you
 
 Very important to note before anything, this is not a replacement for a brain. The goal is not to use the app blindly
