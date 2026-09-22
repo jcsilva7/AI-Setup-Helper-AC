@@ -1,0 +1,49 @@
+name: Test backend (lint and compile for now)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.1"
+          cache-dependency-path: backend/go.sum
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Check formatting
+        run: |
+          test -z "$(gofmt -l .)" || {
+            echo "The following files are not formatted:"
+            gofmt -l .
+            exit 1
+          }
+
+      - name: Run go vet
+        run: go vet ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: latest
+          working-directory: backend
+          args: --timeout=5m
